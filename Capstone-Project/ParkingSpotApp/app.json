@@ -1,0 +1,70 @@
+{
+  "expo": {
+    "name": "ParkSpot",
+    "slug": "parking-spot-app",
+    "scheme": "parkspot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#4A90D9"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.parkspot.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyCiRTCJBWv5Ws09drozNPflqeQpEiL6Bog"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show nearby parking spots.",
+        "NSLocationAlwaysUsageDescription": "This app needs access to your location to show nearby parking spots.",
+        "NSCameraUsageDescription": "This app needs camera access to take photos of parking spots.",
+        "NSPhotoLibraryUsageDescription": "This app needs photo library access to upload parking spot images."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#4A90D9"
+      },
+      "package": "com.parkspot.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCKRB5fHipq7inuT1oO16i4xNJDKAafeUg"
+        }
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.DETECT_SCREEN_CAPTURE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow ParkSpot to use your location to find nearby parking spots."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow ParkSpot to access your photos to upload parking spot images.",
+          "cameraPermission": "Allow ParkSpot to take photos of parking spots."
+        }
+      ],
+      "expo-font"
+    ]
+  }
+}
