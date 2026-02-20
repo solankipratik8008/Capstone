@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { ResponseType } from 'expo-auth-session';
+import { ResponseType, makeRedirectUri } from 'expo-auth-session';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -49,17 +49,24 @@ export const SignInScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Google Sign In using the Expo auth proxy with implicit id_token flow.
-  // The Expo proxy (auth.expo.io) handles the redirect and returns the id_token
-  // in response.params.id_token for implicit flow.
-  // The redirectUri is already registered in Google Cloud Console.
+  // Use the Expo Proxy URI which is whitelisted in Google Cloud
+  const redirectUri = GOOGLE_CONFIG.expoRedirectUri;
+
   const [request, response, promptAsync] = Google.useAuthRequest({
     androidClientId: GOOGLE_CONFIG.androidClientId,
     iosClientId: GOOGLE_CONFIG.iosClientId,
     webClientId: GOOGLE_CONFIG.webClientId,
     scopes: GOOGLE_CONFIG.scopes,
-    redirectUri: GOOGLE_CONFIG.expoRedirectUri,
+    redirectUri,
     responseType: ResponseType.IdToken,
   });
+
+  // DEBUG: Show the redirect URI
+  React.useEffect(() => {
+    // console.log('Redirect URI:', redirectUri); 
+    // Uncomment the line below if you need to see the URI on screen
+    // Alert.alert('Debug Redirect URI', redirectUri);
+  }, [redirectUri]);
 
   React.useEffect(() => {
     if (response?.type === 'success') {

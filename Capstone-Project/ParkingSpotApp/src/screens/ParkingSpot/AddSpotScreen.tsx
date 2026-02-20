@@ -14,6 +14,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -21,6 +22,9 @@ import { Formik } from 'formik';
 import * as Yup from 'yup';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import * as ExpoLocation from 'expo-location';
+
 
 import { Button, Input, ChipGroup, Loading } from '../../components/common';
 import { useParkingSpots, useAuth, useLocation } from '../../context';
@@ -106,6 +110,7 @@ export const AddSpotScreen: React.FC = () => {
   const [selectedSpotType, setSelectedSpotType] = useState<SpotType>(SpotType.DRIVEWAY);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [isAvailable, setIsAvailable] = useState(true);
+  const [selectedCoordinates, setSelectedCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
@@ -146,6 +151,10 @@ export const AddSpotScreen: React.FC = () => {
         setSelectedSpotType(spot.spotType);
         setSelectedAmenities(spot.amenities);
         setIsAvailable(spot.isAvailable);
+        setSelectedCoordinates({
+          latitude: spot.location.latitude,
+          longitude: spot.location.longitude
+        });
       }
     }
   }, [isEditing, spotId, getSpotById]);
@@ -153,7 +162,7 @@ export const AddSpotScreen: React.FC = () => {
   // Pick images from library
   const handlePickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       quality: 0.8,
       selectionLimit: VALIDATION.MAX_IMAGES - images.length,
@@ -193,10 +202,18 @@ export const AddSpotScreen: React.FC = () => {
     try {
       const location = await getCurrentLocation();
       if (location) {
+        // Update form fields
         if (location.address) setFieldValue('address', location.address);
         if (location.city) setFieldValue('city', location.city);
         if (location.state) setFieldValue('state', location.state);
         if (location.zipCode) setFieldValue('zipCode', location.zipCode);
+
+        // Set coordinates
+        setSelectedCoordinates({
+          latitude: location.latitude,
+          longitude: location.longitude
+        });
+
         if (!location.address && !location.city) {
           Alert.alert(
             'Location Found',
@@ -206,7 +223,11 @@ export const AddSpotScreen: React.FC = () => {
       } else {
         Alert.alert(
           'Location Unavailable',
-          'Could not get your current location. Please make sure location services are enabled and try again, or enter your address manually.'
+          'Could not get your current location. Please make sure location services are enabled and try again, or enter your address manually.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() }
+          ]
         );
       }
     } catch (err: any) {
@@ -230,8 +251,7 @@ export const AddSpotScreen: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // Upload images if there are new local images.
-      // On Android, expo-image-picker may return file:// or content:// URIs — both are local.
+      // ... (Image upload logic remains the same)
       const isLocalUri = (uri: string) =>
         uri.startsWith('file://') || uri.startsWith('content://');
 
@@ -252,15 +272,44 @@ export const AddSpotScreen: React.FC = () => {
         });
       }
 
-      // Use user's real location coordinates if available
-      if (!userLocation) {
-        Alert.alert(
-          'Location Required',
-          'Your current location could not be determined. The spot will be saved with approximate coordinates. For accurate results, enable location services and re-list.'
-        );
+      // DETERMINING LOCATION PRIORITIES:
+      // 1. Selected via Autocomplete or "Use Current" (selectedCoordinates)
+      // 2. Current User Location (userLocation)
+      // 3. Default San Francisco
+
+      let latitude = 37.7749;
+      let longitude = -122.4194;
+
+      if (selectedCoordinates) {
+        latitude = selectedCoordinates.latitude;
+        longitude = selectedCoordinates.longitude;
+      } else if (values.address && values.city) {
+        // Fallback: Geocode the address if selectedCoordinates is missing
+        try {
+          const fullAddress = `${values.address}, ${values.city}, ${values.state} ${values.zipCode}`;
+          const geocoded = await ExpoLocation.geocodeAsync(fullAddress);
+          if (geocoded.length > 0) {
+            latitude = geocoded[0].latitude;
+            longitude = geocoded[0].longitude;
+          } else if (userLocation) {
+            console.log('Geocoding failed, falling back to user location');
+            latitude = userLocation.latitude;
+            longitude = userLocation.longitude;
+          }
+        } catch (e) {
+          console.log('Geocoding error:', e);
+          if (userLocation) {
+            latitude = userLocation.latitude;
+            longitude = userLocation.longitude;
+          }
+        }
+      } else if (userLocation) {
+        latitude = userLocation.latitude;
+        longitude = userLocation.longitude;
+      } else {
+        // Fallback or alert if strictness is required
       }
-      const latitude = userLocation?.latitude ?? 37.7749;
-      const longitude = userLocation?.longitude ?? -122.4194;
+
 
       const spotData = {
         ownerId: user.uid,
@@ -453,16 +502,105 @@ export const AddSpotScreen: React.FC = () => {
                     </TouchableOpacity>
                   </View>
 
-                  <Input
-                    label="Street Address"
-                    placeholder="123 Main St"
-                    value={values.address}
-                    onChangeText={handleChange('address')}
-                    onBlur={handleBlur('address')}
-                    error={errors.address}
-                    touched={touched.address}
-                    leftIcon="location-outline"
-                  />
+                  <View style={{ zIndex: 1000, marginBottom: SPACING.md }}>
+                    <Text style={{
+                      fontSize: FONTS.sizes.sm,
+                      fontWeight: FONTS.weights.medium,
+                      color: COLORS.textPrimary,
+                      marginBottom: SPACING.xs,
+                      marginLeft: SPACING.xs,
+                    }}>
+                      Street Address
+                    </Text>
+                    <GooglePlacesAutocomplete
+                      placeholder="Search for an address..."
+                      onPress={(data, details = null) => {
+                        // 'details' is provided when fetchDetails = true
+                        if (details) {
+                          const addressComponents = details.address_components;
+                          let streetNumber = '';
+                          let route = '';
+                          let city = '';
+                          let state = '';
+                          let zipCode = '';
+
+                          addressComponents.forEach((component) => {
+                            if (component.types.includes('street_number')) {
+                              streetNumber = component.long_name;
+                            }
+                            if (component.types.includes('route')) {
+                              route = component.long_name;
+                            }
+                            if (component.types.includes('locality')) {
+                              city = component.long_name;
+                            }
+                            if (component.types.includes('administrative_area_level_1')) {
+                              state = component.short_name;
+                            }
+                            if (component.types.includes('postal_code')) {
+                              zipCode = component.long_name;
+                            }
+                          });
+
+                          setFieldValue('address', `${streetNumber} ${route}`.trim());
+                          setFieldValue('city', city);
+                          setFieldValue('state', state);
+                          setFieldValue('zipCode', zipCode);
+
+                          // Update selected coordinates from Autocomplete details
+                          if (details.geometry && details.geometry.location) {
+                            console.log('Autocomplete Details:', details.geometry.location);
+                            setSelectedCoordinates({
+                              latitude: details.geometry.location.lat,
+                              longitude: details.geometry.location.lng,
+                            });
+                          } else {
+                            // If no geometry, clear any previous selection so we fallback to geocoding
+                            console.log('No geometry in details, clearing selected coordinates');
+                            setSelectedCoordinates(null);
+                          }
+                        }
+                      }}
+                      query={{
+                        key: 'AIzaSyCiRTCJBWv5Ws09drozNPflqeQpEiL6Bog', // Using iOS key as default, but works for JS API too if unrestricted
+                        language: 'en',
+                        components: 'country:ca|country:us', // Limit to Canada and US
+                      }}
+                      fetchDetails={true}
+                      textInputProps={{
+                        value: values.address,
+                        onChangeText: handleChange('address'),
+                        onBlur: handleBlur('address'),
+                      }}
+                      styles={{
+                        textInput: {
+                          height: 50,
+                          backgroundColor: COLORS.white,
+                          borderRadius: BORDER_RADIUS.md,
+                          paddingHorizontal: SPACING.md,
+                          fontSize: FONTS.sizes.md,
+                          color: COLORS.textPrimary,
+                          borderWidth: 1,
+                          borderColor: errors.address && touched.address ? COLORS.error : COLORS.gray[300],
+                        },
+                        listView: {
+                          position: 'absolute',
+                          top: 50, // Height of text input
+                          zIndex: 1000,
+                          backgroundColor: COLORS.white,
+                          borderRadius: BORDER_RADIUS.md,
+                          borderWidth: 1,
+                          borderColor: COLORS.gray[200],
+                        },
+                      }}
+                      enablePoweredByContainer={false}
+                    />
+                    {errors.address && touched.address && (
+                      <Text style={{ fontSize: 12, color: COLORS.error, marginTop: 4, marginLeft: SPACING.xs }}>
+                        {errors.address}
+                      </Text>
+                    )}
+                  </View>
 
                   <View style={styles.row}>
                     <View style={styles.flex1}>
@@ -491,13 +629,14 @@ export const AddSpotScreen: React.FC = () => {
 
                   <Input
                     label="Zip Code"
-                    placeholder="12345"
+                    placeholder="A1A 1A1"
                     value={values.zipCode}
                     onChangeText={handleChange('zipCode')}
                     onBlur={handleBlur('zipCode')}
                     error={errors.zipCode}
                     touched={touched.zipCode}
-                    keyboardType="numeric"
+                    keyboardType="default"
+                    autoCapitalize="characters"
                   />
                 </View>
 

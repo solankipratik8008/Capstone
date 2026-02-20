@@ -2,7 +2,6 @@
   "expo": {
     "name": "ParkSpot",
     "slug": "parking-spot-app",
-    "scheme": "parkspot",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",

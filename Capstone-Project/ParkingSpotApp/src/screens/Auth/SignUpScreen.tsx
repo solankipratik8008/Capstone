@@ -71,11 +71,7 @@ export const SignUpScreen: React.FC = () => {
     webClientId: GOOGLE_CONFIG.webClientId,
     scopes: GOOGLE_CONFIG.scopes,
     responseType: ResponseType.IdToken,
-    redirectUri: makeRedirectUri({
-      // @ts-ignore
-      useProxy: true,
-      scheme: 'parkspot',
-    }),
+    redirectUri: GOOGLE_CONFIG.expoRedirectUri,
   });
 
   React.useEffect(() => {

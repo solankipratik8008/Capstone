@@ -24,8 +24,8 @@ export const GOOGLE_CONFIG = {
     androidClientId: '647587380585-ao58ugh9hdr1u8h0fff139s882u13138.apps.googleusercontent.com',
 
     // Expo Go proxy redirect URI — already registered in Google Cloud Console.
-    // expo-auth-session v7 removed useProxy:true, so we pass this URI explicitly.
-    expoRedirectUri: 'https://auth.expo.io/@solankipratik4094/parking-spot-app',
+    expoRedirectUri: 'https://auth.expo.io/@pratik4094/parking-spot-app',
 
+    // Scopes for Google Sign-In
     scopes: ['openid', 'profile', 'email'],
 };

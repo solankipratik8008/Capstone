@@ -4,6 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { Alert, Linking } from 'react-native';
 import * as ExpoLocation from 'expo-location';
 import { Location, LocationContextType } from '../constants';
 import { calculateDistance as calcDist } from '../services/firebase';
@@ -45,22 +46,61 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
 
     try {
       // Check if permission is granted
-      const { status } = await ExpoLocation.getForegroundPermissionsAsync();
+      const { status, canAskAgain } = await ExpoLocation.getForegroundPermissionsAsync();
 
       if (status !== 'granted') {
-        // Try to request permission
-        const granted = await requestPermission();
-        if (!granted) {
-          setError('Location permission not granted');
+        if (canAskAgain) {
+          const granted = await requestPermission();
+          if (!granted) {
+            Alert.alert('Permission Required', 'Location permission is required to find parking spots near you.');
+            setError('Location permission not granted');
+            setIsLoading(false);
+            return null;
+          }
+        } else {
+          Alert.alert(
+            'Permission Denied',
+            'Location permission is denied. Please enable it in your device settings.',
+            [{ text: 'OK' }]
+          );
+          setError('Location permission denied in settings');
           setIsLoading(false);
           return null;
         }
       }
 
-      // Get current position with lower accuracy requirement for emulators
-      const position = await ExpoLocation.getCurrentPositionAsync({
-        accuracy: ExpoLocation.Accuracy.Balanced,
-      });
+      // Helper to get position with timeout
+      const getPositionWithTimeout = async () => {
+        return new Promise<ExpoLocation.LocationObject>((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            reject(new Error('Location request timed out'));
+          }, 10000); // 10 second timeout
+
+          ExpoLocation.getCurrentPositionAsync({
+            accuracy: ExpoLocation.Accuracy.Balanced,
+          })
+            .then((position) => {
+              clearTimeout(timeoutId);
+              resolve(position);
+            })
+            .catch((err) => {
+              clearTimeout(timeoutId);
+              reject(err);
+            });
+        });
+      };
+
+      let position;
+      try {
+        position = await getPositionWithTimeout();
+      } catch (err) {
+        console.warn('getCurrentPositionAsync failed or timed out, trying last known position:', err);
+        position = await ExpoLocation.getLastKnownPositionAsync();
+      }
+
+      if (!position) {
+        throw new Error('Unable to retrieve location.');
+      }
 
       const location: Location = {
         latitude: position.coords.latitude,
