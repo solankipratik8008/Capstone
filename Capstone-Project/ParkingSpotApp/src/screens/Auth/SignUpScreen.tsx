@@ -1,9 +1,8 @@
 /**
  * Sign Up Screen
- * Allows new users to create an account
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +13,11 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { ResponseType } from 'expo-auth-session';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -24,21 +28,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button, Input } from '../../components/common';
 import { useAuth } from '../../context';
 import { COLORS, SPACING, FONTS, UserRole, RootStackParamList, VALIDATION } from '../../constants';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import { ResponseType } from 'expo-auth-session';
 import { GOOGLE_CONFIG } from '../../config/google';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// Validation schema for sign up form
 const SignUpSchema = Yup.object().shape({
-  name: Yup.string()
-    .min(2, 'Name must be at least 2 characters')
-    .required('Name is required'),
-  email: Yup.string()
-    .email('Please enter a valid email')
-    .required('Email is required'),
+  name: Yup.string().min(2, 'Name must be at least 2 characters').required('Name is required'),
+  email: Yup.string().email('Please enter a valid email').required('Email is required'),
   password: Yup.string()
     .min(VALIDATION.MIN_PASSWORD_LENGTH, `Password must be at least ${VALIDATION.MIN_PASSWORD_LENGTH} characters`)
     .matches(/[a-zA-Z]/, 'Password must contain at least one letter')
@@ -60,25 +56,44 @@ interface FormValues {
 
 export const SignUpScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { signUp, signInWithGoogle } = useAuth();
+  const { signUp, signInWithGoogle, signInWithApple } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
 
-  // Google Sign In Request
+  useEffect(() => {
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAvailable)
+      .catch(() => setAppleAvailable(false));
+  }, []);
+
   const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: GOOGLE_CONFIG.androidClientId,
+    clientId: GOOGLE_CONFIG.webClientId,
     iosClientId: GOOGLE_CONFIG.iosClientId,
-    webClientId: GOOGLE_CONFIG.webClientId,
+    androidClientId: GOOGLE_CONFIG.androidClientId,
     scopes: GOOGLE_CONFIG.scopes,
     responseType: ResponseType.IdToken,
     redirectUri: GOOGLE_CONFIG.expoRedirectUri,
   });
 
-  React.useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      handleGoogleSignIn(id_token);
-    } else if (response?.type === 'error') {
-      Alert.alert('Google Sign In Error', 'Something went wrong');
+  useEffect(() => {
+    if (!response) return;
+
+    if (response.type === 'success') {
+      const idToken =
+        (response.params as any)?.id_token ??
+        response.authentication?.idToken;
+
+      if (idToken) {
+        handleGoogleSignIn(idToken);
+      } else {
+        Alert.alert('Google Sign-In Error', 'No ID token returned. Please try again.');
+      }
+    } else if (response.type === 'error') {
+      const msg =
+        (response.error as any)?.message ||
+        (response.error as any)?.description ||
+        'Google sign-in failed. Please try again.';
+      Alert.alert('Google Sign-In Failed', msg);
     }
   }, [response]);
 
@@ -87,7 +102,38 @@ export const SignUpScreen: React.FC = () => {
     try {
       await signInWithGoogle(idToken);
     } catch (error: any) {
-      Alert.alert('Sign In Failed', error.message);
+      Alert.alert('Sign-Up Failed', error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      const rawNonce = Math.random().toString(36).substring(2, 18);
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce
+      );
+
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+
+      if (!credential.identityToken) {
+        Alert.alert('Apple Sign-In Error', 'No identity token returned.');
+        return;
+      }
+
+      setIsLoading(true);
+      await signInWithApple(credential.identityToken, rawNonce);
+    } catch (error: any) {
+      if (error.code === 'ERR_REQUEST_CANCELED') return;
+      Alert.alert('Apple Sign-Up Failed', error.message || 'Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -97,9 +143,8 @@ export const SignUpScreen: React.FC = () => {
     setIsLoading(true);
     try {
       await signUp(values.email, values.password, values.name, UserRole.USER);
-      // Navigation will be handled by auth state change
     } catch (error: any) {
-      Alert.alert('Sign Up Failed', error.message);
+      Alert.alert('Sign-Up Failed', error.message);
     } finally {
       setIsLoading(false);
     }
@@ -117,10 +162,7 @@ export const SignUpScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* Back button */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
           </TouchableOpacity>
 
@@ -128,7 +170,7 @@ export const SignUpScreen: React.FC = () => {
           <View style={styles.header}>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>
-              Join ParkSpot to find or share parking spaces
+              Join ParkSpot to find and share parking spaces
             </Text>
           </View>
 
@@ -137,15 +179,10 @@ export const SignUpScreen: React.FC = () => {
             initialValues={{ name: '', email: '', password: '', confirmPassword: '' }}
             validationSchema={SignUpSchema}
             onSubmit={handleSignUp}
+            validateOnBlur={false}
+            validateOnChange={false}
           >
-            {({
-              handleChange,
-              handleBlur,
-              handleSubmit,
-              values,
-              errors,
-              touched,
-            }) => (
+            {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
               <View style={styles.form}>
                 <Input
                   label="Full Name"
@@ -198,14 +235,13 @@ export const SignUpScreen: React.FC = () => {
                   touched={touched.confirmPassword}
                 />
 
-                {/* Sign Up Button */}
                 <Button
                   title="Create Account"
                   onPress={() => handleSubmit()}
                   loading={isLoading}
                   fullWidth
                   size="large"
-                  style={styles.signUpButton}
+                  style={styles.primaryButton}
                 />
 
                 <View style={styles.dividerContainer}>
@@ -214,15 +250,30 @@ export const SignUpScreen: React.FC = () => {
                   <View style={styles.divider} />
                 </View>
 
+                {/* Google Sign-Up */}
                 <Button
-                  title="Sign up with Google"
+                  title="Continue with Google"
                   onPress={() => promptAsync()}
                   variant="outline"
                   fullWidth
                   size="large"
                   icon={<Ionicons name="logo-google" size={20} color={COLORS.error} />}
-                  disabled={!request}
+                  disabled={!request || isLoading}
+                  style={styles.socialButton}
                 />
+
+                {/* Apple Sign-Up — iOS only */}
+                {appleAvailable && (
+                  <TouchableOpacity
+                    style={styles.appleButton}
+                    onPress={handleAppleSignIn}
+                    disabled={isLoading}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="logo-apple" size={20} color={COLORS.white} />
+                    <Text style={styles.appleButtonText}>Continue with Apple</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </Formik>
@@ -235,7 +286,6 @@ export const SignUpScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Terms */}
           <Text style={styles.terms}>
             By creating an account, you agree to our{' '}
             <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
@@ -286,8 +336,42 @@ const styles = StyleSheet.create({
   form: {
     marginBottom: SPACING.lg,
   },
-  signUpButton: {
+  primaryButton: {
     marginTop: SPACING.md,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: SPACING.md,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.gray[300],
+  },
+  dividerText: {
+    paddingHorizontal: SPACING.md,
+    color: COLORS.textSecondary,
+    fontSize: FONTS.sizes.sm,
+    fontWeight: FONTS.weights.medium,
+  },
+  socialButton: {
+    marginBottom: SPACING.sm,
+  },
+  appleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: '#000',
+    borderRadius: 12,
+    paddingVertical: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  appleButtonText: {
+    color: COLORS.white,
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semibold,
   },
   footer: {
     flexDirection: 'row',
@@ -312,22 +396,6 @@ const styles = StyleSheet.create({
   },
   termsLink: {
     color: COLORS.primary,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: SPACING.md,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.gray[300],
-  },
-  dividerText: {
-    paddingHorizontal: SPACING.md,
-    color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.sm,
-    fontWeight: FONTS.weights.medium,
   },
 });
 

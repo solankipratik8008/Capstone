@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ParkSpot",
-    "slug": "parking-spot-app",
+    "slug": "parkingspotapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -15,6 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.parkspot.app",
+      "usesAppleSignIn": true,
       "config": {
         "googleMapsApiKey": "AIzaSyCiRTCJBWv5Ws09drozNPflqeQpEiL6Bog"
       },
@@ -70,6 +71,7 @@
           "cameraPermission": "Allow ParkSpot to take photos of parking spots."
         }
       ],
+      "expo-apple-authentication",
       "expo-font",
       [
         "@stripe/stripe-react-native",

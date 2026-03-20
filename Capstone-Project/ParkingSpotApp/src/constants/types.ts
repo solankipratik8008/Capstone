@@ -193,6 +193,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: (idToken: string) => Promise<void>;
+  signInWithApple: (identityToken: string, nonce: string) => Promise<void>;
   signUp: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;

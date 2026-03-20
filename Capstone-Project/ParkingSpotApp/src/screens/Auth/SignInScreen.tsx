@@ -1,9 +1,8 @@
 /**
  * Sign In Screen
- * Allows existing users to sign in with email and password
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +16,8 @@ import {
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { ResponseType } from 'expo-auth-session';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -31,47 +32,42 @@ import { GOOGLE_CONFIG } from '../../config/google';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// Validation schema for sign in form
 const SignInSchema = Yup.object().shape({
-  email: Yup.string()
-    .email('Please enter a valid email')
-    .required('Email is required'),
-  password: Yup.string()
-    .min(6, 'Password must be at least 6 characters')
-    .required('Password is required'),
+  email: Yup.string().email('Please enter a valid email').required('Email is required'),
+  password: Yup.string().min(6, 'Password must be at least 6 characters').required('Password is required'),
 });
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const SignInScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signInWithGoogle, signInWithApple } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
 
-  // Google Sign In using the Expo auth proxy with implicit id_token flow.
-  // Use the Expo Proxy URI which is whitelisted in Google Cloud
-  const redirectUri = GOOGLE_CONFIG.expoRedirectUri;
+  // Check Apple availability once on mount
+  useEffect(() => {
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAvailable)
+      .catch(() => setAppleAvailable(false));
+  }, []);
 
+  // Google Sign-In — implicit IdToken flow through the Expo auth proxy.
+  // webClientId must be the Web client from Firebase Console →
+  // Authentication → Sign-in method → Google → Web SDK configuration.
   const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: GOOGLE_CONFIG.androidClientId,
+    clientId: GOOGLE_CONFIG.webClientId,
     iosClientId: GOOGLE_CONFIG.iosClientId,
-    webClientId: GOOGLE_CONFIG.webClientId,
+    androidClientId: GOOGLE_CONFIG.androidClientId,
     scopes: GOOGLE_CONFIG.scopes,
-    redirectUri,
     responseType: ResponseType.IdToken,
+    redirectUri: GOOGLE_CONFIG.expoRedirectUri,
   });
 
-  // DEBUG: Show the redirect URI
-  React.useEffect(() => {
-    // console.log('Redirect URI:', redirectUri); 
-    // Uncomment the line below if you need to see the URI on screen
-    // Alert.alert('Debug Redirect URI', redirectUri);
-  }, [redirectUri]);
+  useEffect(() => {
+    if (!response) return;
 
-  React.useEffect(() => {
-    if (response?.type === 'success') {
-      // Implicit flow (ResponseType.IdToken) returns id_token in params.
-      // Code flow (default) returns it in response.authentication.idToken.
+    if (response.type === 'success') {
       const idToken =
         (response.params as any)?.id_token ??
         response.authentication?.idToken;
@@ -79,21 +75,16 @@ export const SignInScreen: React.FC = () => {
       if (idToken) {
         handleGoogleSignIn(idToken);
       } else {
-        console.log('Google response params:', JSON.stringify(response.params));
-        console.log('Google authentication:', JSON.stringify(response.authentication));
-        Alert.alert(
-          'Google Sign In Error',
-          'No ID token received. Check the console logs for details.'
-        );
+        Alert.alert('Google Sign-In Error', 'No ID token returned. Please try again.');
       }
-    } else if (response?.type === 'error') {
-      console.error('Google Sign In Error full response:', JSON.stringify(response));
-      const errMsg =
+    } else if (response.type === 'error') {
+      const msg =
         (response.error as any)?.message ||
         (response.error as any)?.description ||
-        JSON.stringify(response.error);
-      Alert.alert('Google Sign In Failed', errMsg || 'Something went wrong. Please try again.');
+        'Google sign-in failed. Please try again.';
+      Alert.alert('Google Sign-In Failed', msg);
     }
+    // 'dismiss' and 'cancel' are silent — user closed the window intentionally
   }, [response]);
 
   const handleGoogleSignIn = async (idToken: string) => {
@@ -101,7 +92,39 @@ export const SignInScreen: React.FC = () => {
     try {
       await signInWithGoogle(idToken);
     } catch (error: any) {
-      Alert.alert('Sign In Failed', error.message);
+      Alert.alert('Sign-In Failed', error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      // Generate a random nonce; hash it for Apple, keep original for Firebase
+      const rawNonce = Math.random().toString(36).substring(2, 18);
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce
+      );
+
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+
+      if (!credential.identityToken) {
+        Alert.alert('Apple Sign-In Error', 'No identity token returned.');
+        return;
+      }
+
+      setIsLoading(true);
+      await signInWithApple(credential.identityToken, rawNonce);
+    } catch (error: any) {
+      if (error.code === 'ERR_REQUEST_CANCELED') return; // user dismissed
+      Alert.alert('Apple Sign-In Failed', error.message || 'Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -111,9 +134,8 @@ export const SignInScreen: React.FC = () => {
     setIsLoading(true);
     try {
       await signIn(values.email, values.password);
-      // Navigation will be handled by auth state change
     } catch (error: any) {
-      Alert.alert('Sign In Failed', error.message);
+      Alert.alert('Sign-In Failed', error.message);
     } finally {
       setIsLoading(false);
     }
@@ -136,9 +158,7 @@ export const SignInScreen: React.FC = () => {
               <Ionicons name="car" size={48} color={COLORS.primary} />
             </View>
             <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>
-              Sign in to find or list parking spots
-            </Text>
+            <Text style={styles.subtitle}>Sign in to find or list parking spots</Text>
           </View>
 
           {/* Form */}
@@ -146,15 +166,10 @@ export const SignInScreen: React.FC = () => {
             initialValues={{ email: '', password: '' }}
             validationSchema={SignInSchema}
             onSubmit={handleSignIn}
+            validateOnBlur={false}
+            validateOnChange={false}
           >
-            {({
-              handleChange,
-              handleBlur,
-              handleSubmit,
-              values,
-              errors,
-              touched,
-            }) => (
+            {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
               <View style={styles.form}>
                 <Input
                   label="Email"
@@ -182,24 +197,20 @@ export const SignInScreen: React.FC = () => {
                   touched={touched.password}
                 />
 
-                {/* Forgot Password Link */}
                 <TouchableOpacity
                   style={styles.forgotPassword}
                   onPress={() => navigation.navigate('ForgotPassword')}
                 >
-                  <Text style={styles.forgotPasswordText}>
-                    Forgot Password?
-                  </Text>
+                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                 </TouchableOpacity>
 
-                {/* Sign In Button */}
                 <Button
                   title="Sign In"
                   onPress={() => handleSubmit()}
                   loading={isLoading}
                   fullWidth
                   size="large"
-                  style={styles.signInButton}
+                  style={styles.primaryButton}
                 />
 
                 <View style={styles.dividerContainer}>
@@ -208,15 +219,30 @@ export const SignInScreen: React.FC = () => {
                   <View style={styles.divider} />
                 </View>
 
+                {/* Google Sign-In */}
                 <Button
-                  title="Sign in with Google"
+                  title="Continue with Google"
                   onPress={() => promptAsync()}
                   variant="outline"
                   fullWidth
                   size="large"
                   icon={<Ionicons name="logo-google" size={20} color={COLORS.error} />}
-                  disabled={!request}
+                  disabled={!request || isLoading}
+                  style={styles.socialButton}
                 />
+
+                {/* Apple Sign-In — iOS only, shown only when available */}
+                {appleAvailable && (
+                  <TouchableOpacity
+                    style={styles.appleButton}
+                    onPress={handleAppleSignIn}
+                    disabled={isLoading}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="logo-apple" size={20} color={COLORS.white} />
+                    <Text style={styles.appleButtonText}>Continue with Apple</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </Formik>
@@ -284,23 +310,8 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: FONTS.weights.medium,
   },
-  signInButton: {
+  primaryButton: {
     marginTop: SPACING.sm,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 'auto',
-  },
-  footerText: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textSecondary,
-  },
-  signUpLink: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.primary,
-    fontWeight: FONTS.weights.semibold,
   },
   dividerContainer: {
     flexDirection: 'row',
@@ -318,7 +329,39 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.sm,
     fontWeight: FONTS.weights.medium,
   },
+  socialButton: {
+    marginBottom: SPACING.sm,
+  },
+  appleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: '#000',
+    borderRadius: 12,
+    paddingVertical: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  appleButtonText: {
+    color: COLORS.white,
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semibold,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 'auto',
+  },
+  footerText: {
+    fontSize: FONTS.sizes.md,
+    color: COLORS.textSecondary,
+  },
+  signUpLink: {
+    fontSize: FONTS.sizes.md,
+    color: COLORS.primary,
+    fontWeight: FONTS.weights.semibold,
+  },
 });
 
 export default SignInScreen;
-

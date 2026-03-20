@@ -11,6 +11,7 @@ import {
   updateProfile,
   onAuthStateChanged,
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithCredential,
   User as FirebaseUser,
 } from 'firebase/auth';
@@ -165,6 +166,48 @@ export const signInWithGoogle = async (idToken: string): Promise<User> => {
     return userData;
   } catch (error: any) {
     console.error('Google sign in error:', error);
+    throw handleAuthError(error);
+  }
+};
+
+/**
+ * Signs in with Apple identity token (from expo-apple-authentication)
+ * rawNonce must be the ORIGINAL (unhashed) nonce used when requesting Apple auth.
+ */
+export const signInWithApple = async (
+  identityToken: string,
+  rawNonce: string
+): Promise<User> => {
+  try {
+    const provider = new OAuthProvider('apple.com');
+    const credential = provider.credential({ idToken: identityToken, rawNonce });
+    const userCredential = await signInWithCredential(auth, credential);
+    const firebaseUser = userCredential.user;
+
+    let userData = await getUserData(firebaseUser.uid);
+
+    if (!userData) {
+      const newUserData: Omit<User, 'uid'> = {
+        email: firebaseUser.email || '',
+        name: firebaseUser.displayName || 'Apple User',
+        role: 'user' as UserRole,
+        photoURL: firebaseUser.photoURL || undefined,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      await setDoc(doc(db, COLLECTIONS.USERS, firebaseUser.uid), {
+        ...newUserData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      userData = { uid: firebaseUser.uid, ...newUserData };
+    }
+
+    return userData;
+  } catch (error: any) {
+    console.error('Apple sign in error:', error);
     throw handleAuthError(error);
   }
 };

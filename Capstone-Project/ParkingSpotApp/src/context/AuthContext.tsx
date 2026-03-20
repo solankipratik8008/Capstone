@@ -9,6 +9,7 @@ import {
   signUp as firebaseSignUp,
   signIn as firebaseSignIn,
   signInWithGoogle as firebaseSignInWithGoogle,
+  signInWithApple as firebaseSignInWithApple,
   signOut as firebaseSignOut,
   resetPassword as firebaseResetPassword,
   getUserData,
@@ -83,6 +84,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   /**
+   * Sign in with Apple
+   */
+  const signInWithApple = async (identityToken: string, nonce: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const userData = await firebaseSignInWithApple(identityToken, nonce);
+      setUser(userData);
+    } catch (error) {
+      setIsLoading(false);
+      throw error;
+    }
+  };
+
+  /**
    * Create a new account
    */
   const signUp = async (
@@ -141,6 +156,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: !!user,
     signIn,
     signInWithGoogle,
+    signInWithApple,
     signUp,
     signOut,
     resetPassword,

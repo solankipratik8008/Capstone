@@ -11,6 +11,7 @@ export {
   signUp,
   signIn,
   signInWithGoogle,
+  signInWithApple,
   signOut,
   resetPassword,
   getUserData,
