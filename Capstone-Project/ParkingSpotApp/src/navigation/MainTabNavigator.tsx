@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { MapStackNavigator } from './MapStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
+import { ChatStackNavigator } from './ChatStackNavigator';
 import SearchScreen from '../screens/Search/SearchScreen';
 import AddSpotScreen from '../screens/ParkingSpot/AddSpotScreen';
 import { useAuth } from '../context';
@@ -19,6 +20,7 @@ export type MainTabParamList = {
   MapTab: undefined;
   SearchTab: undefined;
   AddSpotTab: undefined;
+  MessagesTab: undefined;
   ProfileTab: undefined;
 };
 
@@ -44,6 +46,9 @@ export const MainTabNavigator: React.FC = () => {
               break;
             case 'AddSpotTab':
               iconName = focused ? 'add-circle' : 'add-circle-outline';
+              break;
+            case 'MessagesTab':
+              iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
               break;
             case 'ProfileTab':
               iconName = focused ? 'person' : 'person-outline';
@@ -79,6 +84,11 @@ export const MainTabNavigator: React.FC = () => {
         />
       )}
       <Tab.Screen
+        name="MessagesTab"
+        component={ChatStackNavigator}
+        options={{ tabBarLabel: 'Messages' }}
+      />
+      <Tab.Screen
         name="ProfileTab"
         component={ProfileStackNavigator}
         options={{ tabBarLabel: 'Profile' }}
@@ -92,8 +102,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.gray[200],
-    // Let the navigator handle safe area insets automatically
-    // height and paddingBottom are managed by the default tab bar implementation
   },
   tabBarLabel: {
     fontSize: FONTS.sizes.xs,

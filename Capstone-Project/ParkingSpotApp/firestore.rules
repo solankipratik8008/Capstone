@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection — required for login to work
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Parking spots collection
+    match /parkingSpots/{spotId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null &&
+        resource.data.ownerId == request.auth.uid;
+    }
+
+    // Bookings collection
+    match /bookings/{bookingId} {
+      // Any authenticated user can read bookings — required for slot conflict
+      // checking (a prospective booker queries bookings for a spot they don't own).
+      allow read: if request.auth != null;
+
+      // Only authenticated users can create bookings
+      allow create: if request.auth != null;
+
+      // Only the renter or the spot owner can update a booking
+      allow update: if request.auth != null &&
+        (request.auth.uid == resource.data.userId ||
+         request.auth.uid == resource.data.ownerId);
+
+      allow delete: if false;
+    }
+
+    // Chat system
+    match /chats/{chatId} {
+      allow create: if request.auth != null;
+
+      allow read, write: if request.auth != null &&
+        request.auth.uid in resource.data.participants;
+
+      match /messages/{messageId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
+  }
+}

@@ -51,7 +51,7 @@ export interface ParkingSpot {
   description: string;
   location: Location;
   pricePerHour: number;
-  pricePerDay?: number;
+  pricePerDay?: number | null;
   imageURLs: string[];
   isAvailable: boolean;
   availabilitySchedule?: AvailabilitySchedule;
@@ -85,15 +85,23 @@ export enum Amenity {
   NEARBY_RESTROOM = 'nearby_restroom',
 }
 
-// Booking interface for future booking feature
+// Booking interface
 export interface Booking {
   id: string;
   spotId: string;
+  spotTitle: string;
+  spotAddress: string;
   userId: string;
+  userName: string;
+  userEmail?: string;
+  ownerId: string;
   startTime: Date;
   endTime: Date;
-  totalPrice: number;
+  hours: number;
+  totalAmount: number;
   status: BookingStatus;
+  paymentIntentId?: string;
+  paymentStatus: 'pending' | 'succeeded' | 'failed';
   createdAt: Date;
 }
 
@@ -102,6 +110,31 @@ export enum BookingStatus {
   CONFIRMED = 'confirmed',
   CANCELLED = 'cancelled',
   COMPLETED = 'completed',
+}
+
+// Message interface - stored in Firestore 'chats/{chatId}/messages' subcollection
+export interface Message {
+  id: string;
+  chatId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  createdAt: Date;
+  read: boolean;
+}
+
+// Chat interface - stored in Firestore 'chats' collection
+export interface Chat {
+  id: string;
+  participants: string[];
+  participantNames: { [uid: string]: string };
+  participantPhotos?: { [uid: string]: string };
+  lastMessage: string;
+  lastMessageTime: Date;
+  spotId: string;
+  spotTitle: string;
+  createdAt: Date;
+  unreadCount?: { [uid: string]: number };
 }
 
 // Search/filter parameters
@@ -127,7 +160,17 @@ export type MainTabParamList = {
   MapTab: undefined;
   SearchTab: undefined;
   AddSpotTab: undefined;
+  MessagesTab: undefined;
   ProfileTab: undefined;
+};
+
+export type ChatStackParamList = {
+  ChatList: undefined;
+  Chat: { chatId: string; otherUserName: string; spotTitle: string };
+};
+
+export type BookingStackParamList = {
+  Booking: { spotId: string; spotTitle: string; pricePerHour: number; ownerId: string };
 };
 
 export type MapStackParamList = {

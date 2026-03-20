@@ -12,12 +12,14 @@ import { ParkingSpot, COLORS, SPACING, BORDER_RADIUS, FONTS, SHADOWS } from '../
 interface ParkingMarkerProps {
   spot: ParkingSpot;
   onPress: () => void;
+  onDetailsPress?: () => void;
   selected?: boolean;
 }
 
 export const ParkingMarker: React.FC<ParkingMarkerProps> = ({
   spot,
   onPress,
+  onDetailsPress,
   selected = false,
 }) => {
   return (
@@ -27,6 +29,7 @@ export const ParkingMarker: React.FC<ParkingMarkerProps> = ({
         longitude: spot.location.longitude,
       }}
       onPress={onPress}
+      onCalloutPress={onDetailsPress || onPress}
       tracksViewChanges={false}
     >
       {/* Custom marker view */}

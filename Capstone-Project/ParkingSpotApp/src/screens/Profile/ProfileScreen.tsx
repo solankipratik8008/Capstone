@@ -172,6 +172,12 @@ export const ProfileScreen: React.FC = () => {
                 badgeCount={userSpots.length}
               />
               <MenuItem
+                icon="people-outline"
+                title="Spot Bookings"
+                subtitle="See who booked your spots"
+                onPress={() => navigation.navigate('OwnerBookings')}
+              />
+              <MenuItem
                 icon="add-circle-outline"
                 title="Add New Spot"
                 subtitle="List a new parking space"
@@ -191,14 +197,20 @@ export const ProfileScreen: React.FC = () => {
               onPress={() => navigation.navigate('EditProfile')}
             />
             <MenuItem
+              icon="calendar-outline"
+              title="My Bookings"
+              subtitle="View your parking reservations"
+              onPress={() => navigation.navigate('MyBookings')}
+            />
+            <MenuItem
               icon="notifications-outline"
               title="Notifications"
-              onPress={() => Alert.alert('Coming Soon', 'Notification settings coming soon.')}
+              onPress={() => Alert.alert('Notifications', 'You will receive notifications for:\n• Booking confirmations\n• Payment receipts\n• Spot availability updates')}
             />
             <MenuItem
               icon="card-outline"
               title="Payment Methods"
-              onPress={() => Alert.alert('Coming Soon', 'Payment settings coming soon.')}
+              onPress={() => Alert.alert('Payment Methods', 'Payments are securely processed by Stripe.\nYour card details are never stored on our servers.\n\nAdd a card when making a booking.')}
             />
           </Card>
         </View>
@@ -210,17 +222,17 @@ export const ProfileScreen: React.FC = () => {
             <MenuItem
               icon="help-circle-outline"
               title="Help Center"
-              onPress={() => Alert.alert('Help', 'Visit our help center for assistance.')}
+              onPress={() => Alert.alert('Help Center', 'Need help? Contact us at:\nsupport@parkspot.app\n\nCommon questions:\n• How do I list my spot?\n• How do I cancel a booking?\n• How long does payment take?')}
             />
             <MenuItem
               icon="document-text-outline"
               title="Terms of Service"
-              onPress={() => Alert.alert('Terms', 'Terms of Service')}
+              onPress={() => Alert.alert('Terms of Service', 'By using ParkSpot, you agree to our terms. Bookings are binding once payment is processed. Cancellations must be made 2 hours before booking start for a full refund.')}
             />
             <MenuItem
               icon="shield-checkmark-outline"
               title="Privacy Policy"
-              onPress={() => Alert.alert('Privacy', 'Privacy Policy')}
+              onPress={() => Alert.alert('Privacy Policy', 'ParkSpot collects location data to show nearby spots. We use Firebase for secure authentication. We never sell your personal data to third parties.')}
             />
           </Card>
         </View>

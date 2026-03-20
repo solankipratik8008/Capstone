@@ -229,6 +229,7 @@ export const HomeMapScreen: React.FC = () => {
             spot={spot}
             selected={selectedSpotId === spot.id}
             onPress={() => handleMarkerPress(spot)}
+            onDetailsPress={() => handleCardPress(spot.id)}
           />
         ))}
       </MapView>

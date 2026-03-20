@@ -9,6 +9,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 import EditProfileScreen from '../screens/Profile/EditProfileScreen';
 import MySpotsScreen from '../screens/Profile/MySpotsScreen';
+import MyBookingsScreen from '../screens/Profile/MyBookingsScreen';
+import OwnerBookingsScreen from '../screens/Profile/OwnerBookingsScreen';
 import AddSpotScreen from '../screens/ParkingSpot/AddSpotScreen';
 import SpotDetailsScreen from '../screens/ParkingSpot/SpotDetailsScreen';
 import { COLORS } from '../constants';
@@ -17,6 +19,8 @@ export type ProfileStackParamList = {
   Profile: undefined;
   EditProfile: undefined;
   MySpots: undefined;
+  MyBookings: undefined;
+  OwnerBookings: undefined;
   AddSpot: { spotId?: string } | undefined;
   SpotDetails: { spotId: string };
 };
@@ -35,6 +39,8 @@ export const ProfileStackNavigator: React.FC = () => {
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="MySpots" component={MySpotsScreen} />
+      <Stack.Screen name="MyBookings" component={MyBookingsScreen} />
+      <Stack.Screen name="OwnerBookings" component={OwnerBookingsScreen} />
       <Stack.Screen name="AddSpot" component={AddSpotScreen} />
       <Stack.Screen name="SpotDetails" component={SpotDetailsScreen} />
     </Stack.Navigator>

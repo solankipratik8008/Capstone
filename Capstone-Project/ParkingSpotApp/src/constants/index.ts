@@ -71,4 +71,6 @@ export const COLLECTIONS = {
   PARKING_SPOTS: 'parkingSpots',
   BOOKINGS: 'bookings',
   REVIEWS: 'reviews',
+  CHATS: 'chats',
+  MESSAGES: 'messages',
 };

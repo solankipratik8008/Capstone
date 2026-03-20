@@ -22,7 +22,14 @@
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show nearby parking spots.",
         "NSLocationAlwaysUsageDescription": "This app needs access to your location to show nearby parking spots.",
         "NSCameraUsageDescription": "This app needs camera access to take photos of parking spots.",
-        "NSPhotoLibraryUsageDescription": "This app needs photo library access to upload parking spot images."
+        "NSPhotoLibraryUsageDescription": "This app needs photo library access to upload parking spot images.",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.647587380585-lfqvq6ruaqi8hnsik291oejvenf3n0jc"
+            ]
+          }
+        ]
       }
     },
     "android": {
@@ -63,7 +70,14 @@
           "cameraPermission": "Allow ParkSpot to take photos of parking spots."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.parkspot.app",
+          "enableGooglePay": true
+        }
+      ]
     ]
   }
 }

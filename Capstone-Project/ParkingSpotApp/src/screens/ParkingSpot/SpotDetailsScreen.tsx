@@ -14,14 +14,16 @@ import {
   Dimensions,
   Linking,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { Button, Badge, Loading, Avatar } from '../../components/common';
-import { useParkingSpots, useLocation } from '../../context';
+import { useParkingSpots, useLocation, useAuth } from '../../context';
 import {
   COLORS,
   SPACING,
@@ -33,22 +35,26 @@ import {
   ParkingSpot,
 } from '../../constants';
 import { MapStackParamList } from '../../navigation/MapStackNavigator';
+import { getOrCreateChat } from '../../services/firebase/chat';
 
 const { width } = Dimensions.get('window');
 
 type RouteProps = RouteProp<MapStackParamList, 'SpotDetails'>;
+type NavProp = NativeStackNavigationProp<MapStackParamList>;
 
 export const SpotDetailsScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavProp>();
   const route = useRoute<RouteProps>();
   const { spotId } = route.params;
 
   const { getSpotById } = useParkingSpots();
   const { calculateDistance } = useLocation();
+  const { user } = useAuth();
 
   const [spot, setSpot] = useState<ParkingSpot | undefined>();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   // Fetch spot data
   useEffect(() => {
@@ -73,13 +79,54 @@ export const SpotDetailsScreen: React.FC = () => {
     });
   };
 
-  // Contact owner (placeholder)
-  const handleContactOwner = () => {
-    Alert.alert(
-      'Contact Owner',
-      'This feature will allow you to message the parking spot owner.',
-      [{ text: 'OK' }]
-    );
+  // Open chat with owner
+  const handleContactOwner = async () => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to message the owner.');
+      return;
+    }
+    if (!spot) return;
+    if (user.uid === spot.ownerId) {
+      Alert.alert('This is your spot', 'You cannot message yourself.');
+      return;
+    }
+    setIsChatLoading(true);
+    try {
+      const chatId = await getOrCreateChat(
+        user.uid,
+        user.name,
+        spot.ownerId,
+        spot.ownerName,
+        spot.id,
+        spot.title,
+        user.photoURL,
+        undefined
+      );
+      // Navigate to Chat screen in the MessagesTab
+      (navigation as any).navigate('MessagesTab', {
+        screen: 'Chat',
+        params: { chatId, otherUserName: spot.ownerName, spotTitle: spot.title },
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Could not start conversation.');
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  // Navigate to booking screen
+  const handleBookNow = () => {
+    if (!spot) return;
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to book a spot.');
+      return;
+    }
+    navigation.navigate('Booking', {
+      spotId: spot.id,
+      spotTitle: spot.title,
+      pricePerHour: spot.pricePerHour,
+      ownerId: spot.ownerId,
+    });
   };
 
   if (isLoading) {
@@ -266,8 +313,13 @@ export const SpotDetailsScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.messageButton}
                 onPress={handleContactOwner}
+                disabled={isChatLoading}
               >
-                <Ionicons name="chatbubble-outline" size={20} color={COLORS.primary} />
+                {isChatLoading ? (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                ) : (
+                  <Ionicons name="chatbubble-outline" size={20} color={COLORS.primary} />
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -293,7 +345,7 @@ export const SpotDetailsScreen: React.FC = () => {
             />
             <Button
               title="Book Now"
-              onPress={handleContactOwner}
+              onPress={handleBookNow}
               disabled={!spot.isAvailable}
             />
           </View>
