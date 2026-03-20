@@ -13,8 +13,7 @@ import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { ChatStackNavigator } from './ChatStackNavigator';
 import SearchScreen from '../screens/Search/SearchScreen';
 import AddSpotScreen from '../screens/ParkingSpot/AddSpotScreen';
-import { useAuth } from '../context';
-import { COLORS, FONTS, UserRole } from '../constants';
+import { COLORS, FONTS } from '../constants';
 
 export type MainTabParamList = {
   MapTab: undefined;
@@ -27,9 +26,6 @@ export type MainTabParamList = {
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export const MainTabNavigator: React.FC = () => {
-  const { user } = useAuth();
-  const isHomeowner = user?.role === UserRole.HOMEOWNER;
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -76,13 +72,11 @@ export const MainTabNavigator: React.FC = () => {
         component={SearchScreen}
         options={{ tabBarLabel: 'Search' }}
       />
-      {isHomeowner && (
-        <Tab.Screen
-          name="AddSpotTab"
-          component={AddSpotScreen}
-          options={{ tabBarLabel: 'Add Spot' }}
-        />
-      )}
+      <Tab.Screen
+        name="AddSpotTab"
+        component={AddSpotScreen}
+        options={{ tabBarLabel: 'Add Spot' }}
+      />
       <Tab.Screen
         name="MessagesTab"
         component={ChatStackNavigator}

@@ -25,7 +25,6 @@ import {
   FONTS,
   BORDER_RADIUS,
   SHADOWS,
-  UserRole,
 } from '../../constants';
 import { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 
@@ -78,8 +77,6 @@ export const ProfileScreen: React.FC = () => {
   const { user, signOut } = useAuth();
   const { userSpots } = useParkingSpots();
 
-  const isHomeowner = user?.role === UserRole.HOMEOWNER;
-
   const handleSignOut = () => {
     Alert.alert(
       'Sign Out',
@@ -122,8 +119,8 @@ export const ProfileScreen: React.FC = () => {
             <Text style={styles.userName}>{user?.name || 'User'}</Text>
             <Text style={styles.userEmail}>{user?.email}</Text>
             <Badge
-              text={isHomeowner ? 'Homeowner' : 'User'}
-              variant={isHomeowner ? 'info' : 'default'}
+              text="Member"
+              variant="default"
             />
           </View>
 
@@ -136,56 +133,52 @@ export const ProfileScreen: React.FC = () => {
           </TouchableOpacity>
         </Card>
 
-        {/* Stats Card (for homeowners) */}
-        {isHomeowner && (
-          <Card style={styles.statsCard}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userSpots.length}</Text>
-              <Text style={styles.statLabel}>Listed Spots</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {userSpots.filter((s) => s.isAvailable).length}
-              </Text>
-              <Text style={styles.statLabel}>Available</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>0</Text>
-              <Text style={styles.statLabel}>Bookings</Text>
-            </View>
-          </Card>
-        )}
+        {/* Stats Card */}
+        <Card style={styles.statsCard}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{userSpots.length}</Text>
+            <Text style={styles.statLabel}>Listed Spots</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>
+              {userSpots.filter((s) => s.isAvailable).length}
+            </Text>
+            <Text style={styles.statLabel}>Available</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statLabel}>Bookings</Text>
+          </View>
+        </Card>
 
         {/* Menu Section - Parking */}
-        {isHomeowner && (
-          <View style={styles.menuSection}>
-            <Text style={styles.menuSectionTitle}>My Parking</Text>
-            <Card padding="none">
-              <MenuItem
-                icon="car-outline"
-                title="My Parking Spots"
-                subtitle={`${userSpots.length} spots listed`}
-                onPress={() => navigation.navigate('MySpots')}
-                showBadge
-                badgeCount={userSpots.length}
-              />
-              <MenuItem
-                icon="people-outline"
-                title="Spot Bookings"
-                subtitle="See who booked your spots"
-                onPress={() => navigation.navigate('OwnerBookings')}
-              />
-              <MenuItem
-                icon="add-circle-outline"
-                title="Add New Spot"
-                subtitle="List a new parking space"
-                onPress={() => navigation.navigate('AddSpot')}
-              />
-            </Card>
-          </View>
-        )}
+        <View style={styles.menuSection}>
+          <Text style={styles.menuSectionTitle}>My Parking</Text>
+          <Card padding="none">
+            <MenuItem
+              icon="car-outline"
+              title="My Parking Spots"
+              subtitle={`${userSpots.length} spots listed`}
+              onPress={() => navigation.navigate('MySpots')}
+              showBadge
+              badgeCount={userSpots.length}
+            />
+            <MenuItem
+              icon="people-outline"
+              title="Spot Bookings"
+              subtitle="See who booked your spots"
+              onPress={() => navigation.navigate('OwnerBookings')}
+            />
+            <MenuItem
+              icon="add-circle-outline"
+              title="Add New Spot"
+              subtitle="List a new parking space"
+              onPress={() => navigation.navigate('AddSpot')}
+            />
+          </Card>
+        </View>
 
         {/* Menu Section - Account */}
         <View style={styles.menuSection}>

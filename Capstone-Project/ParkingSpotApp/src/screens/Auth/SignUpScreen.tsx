@@ -21,12 +21,12 @@ import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Button, Input, Chip } from '../../components/common';
+import { Button, Input } from '../../components/common';
 import { useAuth } from '../../context';
 import { COLORS, SPACING, FONTS, UserRole, RootStackParamList, VALIDATION } from '../../constants';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { ResponseType, makeRedirectUri } from 'expo-auth-session';
+import { ResponseType } from 'expo-auth-session';
 import { GOOGLE_CONFIG } from '../../config/google';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -62,7 +62,6 @@ export const SignUpScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { signUp, signInWithGoogle } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.USER);
 
   // Google Sign In Request
   const [request, response, promptAsync] = Google.useAuthRequest({
@@ -97,7 +96,7 @@ export const SignUpScreen: React.FC = () => {
   const handleSignUp = async (values: FormValues) => {
     setIsLoading(true);
     try {
-      await signUp(values.email, values.password, values.name, selectedRole);
+      await signUp(values.email, values.password, values.name, UserRole.USER);
       // Navigation will be handled by auth state change
     } catch (error: any) {
       Alert.alert('Sign Up Failed', error.message);
@@ -131,62 +130,6 @@ export const SignUpScreen: React.FC = () => {
             <Text style={styles.subtitle}>
               Join ParkSpot to find or share parking spaces
             </Text>
-          </View>
-
-          {/* Role Selection */}
-          <View style={styles.roleSection}>
-            <Text style={styles.roleLabel}>I want to:</Text>
-            <View style={styles.roleOptions}>
-              <TouchableOpacity
-                style={[
-                  styles.roleOption,
-                  selectedRole === UserRole.USER && styles.roleOptionSelected,
-                ]}
-                onPress={() => setSelectedRole(UserRole.USER)}
-              >
-                <Ionicons
-                  name="search"
-                  size={24}
-                  color={selectedRole === UserRole.USER ? COLORS.primary : COLORS.textMuted}
-                />
-                <Text
-                  style={[
-                    styles.roleOptionText,
-                    selectedRole === UserRole.USER && styles.roleOptionTextSelected,
-                  ]}
-                >
-                  Find Parking
-                </Text>
-                <Text style={styles.roleOptionDesc}>
-                  Search and rent parking spots
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.roleOption,
-                  selectedRole === UserRole.HOMEOWNER && styles.roleOptionSelected,
-                ]}
-                onPress={() => setSelectedRole(UserRole.HOMEOWNER)}
-              >
-                <Ionicons
-                  name="home"
-                  size={24}
-                  color={selectedRole === UserRole.HOMEOWNER ? COLORS.primary : COLORS.textMuted}
-                />
-                <Text
-                  style={[
-                    styles.roleOptionText,
-                    selectedRole === UserRole.HOMEOWNER && styles.roleOptionTextSelected,
-                  ]}
-                >
-                  List Parking
-                </Text>
-                <Text style={styles.roleOptionDesc}>
-                  Rent out my parking space
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* Form */}
@@ -339,47 +282,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: FONTS.sizes.md,
     color: COLORS.textSecondary,
-  },
-  roleSection: {
-    marginBottom: SPACING.xl,
-  },
-  roleLabel: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.medium,
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
-  },
-  roleOptions: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  roleOption: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: SPACING.md,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.gray[200],
-  },
-  roleOptionSelected: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primary + '08',
-  },
-  roleOptionText: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.semibold,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.sm,
-  },
-  roleOptionTextSelected: {
-    color: COLORS.primary,
-  },
-  roleOptionDesc: {
-    fontSize: FONTS.sizes.xs,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginTop: SPACING.xs,
   },
   form: {
     marginBottom: SPACING.lg,

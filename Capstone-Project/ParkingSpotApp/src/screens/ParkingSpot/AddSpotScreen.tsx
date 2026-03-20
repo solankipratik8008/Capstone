@@ -377,6 +377,8 @@ export const AddSpotScreen: React.FC = () => {
             validationSchema={SpotSchema}
             onSubmit={handleSubmit}
             enableReinitialize
+            validateOnBlur={false}
+            validateOnChange={false}
           >
             {({
               handleChange,
