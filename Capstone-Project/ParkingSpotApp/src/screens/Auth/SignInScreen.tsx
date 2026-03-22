@@ -61,16 +61,16 @@ export const SignInScreen: React.FC = () => {
   // Detect if the developer still needs to set the web client ID
   const googleNotConfigured = GOOGLE_CONFIG.webClientId.startsWith('PASTE_');
 
-  // Google Sign-In — implicit IdToken flow through the Expo auth proxy.
-  // webClientId must be the Web client from Firebase Console →
-  // Authentication → Sign-in method → Google → Web SDK configuration.
+  // Google Sign-In — authorization code flow (implicit/IdToken flow is
+  // blocked by Google for OAuth clients created after 2022).
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: GOOGLE_CONFIG.webClientId,
     iosClientId: GOOGLE_CONFIG.iosClientId,
     androidClientId: GOOGLE_CONFIG.androidClientId,
-    scopes: GOOGLE_CONFIG.scopes,
-    responseType: ResponseType.IdToken,
+    scopes: [...GOOGLE_CONFIG.scopes, 'openid'],
+    responseType: ResponseType.Code,
     redirectUri: GOOGLE_CONFIG.expoRedirectUri,
+    usePKCE: false,
   });
 
   useEffect(() => {
@@ -78,8 +78,8 @@ export const SignInScreen: React.FC = () => {
 
     if (response.type === 'success') {
       const idToken =
-        (response.params as any)?.id_token ??
-        response.authentication?.idToken;
+        response.authentication?.idToken ??
+        (response.params as any)?.id_token;
 
       if (idToken) {
         handleGoogleSignIn(idToken);
