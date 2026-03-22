@@ -80,6 +80,12 @@
           "merchantIdentifier": "merchant.com.parkspot.app",
           "enableGooglePay": true
         }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.647587380585-lfqvq6ruaqi8hnsik291oejvenf3n0jc"
+        }
       ]
     ],
     "extra": {

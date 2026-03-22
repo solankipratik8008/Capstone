@@ -14,8 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import { ResponseType } from 'expo-auth-session';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import Constants from 'expo-constants';
@@ -31,7 +30,7 @@ import { useAuth } from '../../context';
 import { COLORS, SPACING, FONTS, RootStackParamList } from '../../constants';
 import { GOOGLE_CONFIG } from '../../config/google';
 
-WebBrowser.maybeCompleteAuthSession();
+WebBrowser.maybeCompleteAuthSession(); // needed for iOS OAuth callbacks
 
 const SignInSchema = Yup.object().shape({
   email: Yup.string().email('Please enter a valid email').required('Email is required'),
@@ -58,52 +57,31 @@ export const SignInScreen: React.FC = () => {
       .catch(() => setAppleAvailable(false));
   }, []);
 
-  // Detect if the developer still needs to set the web client ID
-  const googleNotConfigured = GOOGLE_CONFIG.webClientId.startsWith('PASTE_');
-
-  // Expo Go: use proxy URI (button shows info alert, not functional)
-  // Native build (iOS/Android): use reverse-client-ID scheme per platform
-  const redirectUri = isExpoGo
-    ? GOOGLE_CONFIG.expoRedirectUri
-    : GOOGLE_CONFIG.nativeRedirectUri;
-
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: GOOGLE_CONFIG.webClientId,
-    iosClientId: GOOGLE_CONFIG.iosClientId,
-    androidClientId: GOOGLE_CONFIG.androidClientId,
-    scopes: ['openid', 'profile', 'email'],
-    responseType: ResponseType.Code,
-    redirectUri,
-    usePKCE: true,
-  });
-
+  // Configure native Google Sign-In on mount
   useEffect(() => {
-    if (!response) return;
+    if (isExpoGo) return;
+    GoogleSignin.configure({ webClientId: GOOGLE_CONFIG.webClientId });
+  }, []);
 
-    if (response.type === 'success') {
-      const idToken = response.authentication?.idToken;
-
-      if (idToken) {
-        handleGoogleSignIn(idToken);
-      } else {
-        Alert.alert('Google Sign-In Error', 'No ID token returned. Please try again.');
-      }
-    } else if (response.type === 'error') {
-      const msg =
-        (response.error as any)?.message ||
-        (response.error as any)?.description ||
-        'Google sign-in failed. Please try again.';
-      Alert.alert('Google Sign-In Failed', msg);
+  const handleGoogleSignIn = async () => {
+    if (isExpoGo) {
+      Alert.alert(
+        'Google Sign-In Unavailable',
+        'Google Sign-In is not supported in Expo Go. Please use email/password, or use the production app build.'
+      );
+      return;
     }
-    // 'dismiss' and 'cancel' are silent — user closed the window intentionally
-  }, [response]);
-
-  const handleGoogleSignIn = async (idToken: string) => {
     setIsLoading(true);
     try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken;
+      if (!idToken) throw new Error('No ID token returned from Google.');
       await signInWithGoogle(idToken);
     } catch (error: any) {
-      Alert.alert('Sign-In Failed', error.message);
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) return;
+      if (error.code === statusCodes.IN_PROGRESS) return;
+      Alert.alert('Google Sign-In Failed', error.message || 'Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -233,23 +211,7 @@ export const SignInScreen: React.FC = () => {
                 {/* Google Sign-In */}
                 <Button
                   title="Continue with Google"
-                  onPress={() => {
-                    if (isExpoGo) {
-                      Alert.alert(
-                        'Google Sign-In Unavailable',
-                        'Google Sign-In is not supported in Expo Go due to OAuth restrictions. Please use email/password, or use the production app build.'
-                      );
-                      return;
-                    }
-                    if (googleNotConfigured) {
-                      Alert.alert(
-                        'Google Not Configured',
-                        'Open src/config/google.ts and set webClientId to your Firebase Web client ID.'
-                      );
-                      return;
-                    }
-                    promptAsync();
-                  }}
+                  onPress={handleGoogleSignIn}
                   variant="outline"
                   fullWidth
                   size="large"

@@ -14,8 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import { ResponseType } from 'expo-auth-session';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import Constants from 'expo-constants';
@@ -62,55 +61,34 @@ export const SignUpScreen: React.FC = () => {
   const [appleAvailable, setAppleAvailable] = useState(false);
 
   const isExpoGo = Constants.appOwnership === 'expo';
-  const googleNotConfigured = GOOGLE_CONFIG.webClientId.startsWith('PASTE_');
 
   useEffect(() => {
     if (isExpoGo) return;
+    GoogleSignin.configure({ webClientId: GOOGLE_CONFIG.webClientId });
     AppleAuthentication.isAvailableAsync()
       .then(setAppleAvailable)
       .catch(() => setAppleAvailable(false));
   }, []);
 
-  const redirectUri = isExpoGo
-    ? GOOGLE_CONFIG.expoRedirectUri
-    : GOOGLE_CONFIG.nativeRedirectUri;
-
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: GOOGLE_CONFIG.webClientId,
-    iosClientId: GOOGLE_CONFIG.iosClientId,
-    androidClientId: GOOGLE_CONFIG.androidClientId,
-    scopes: ['openid', 'profile', 'email'],
-    responseType: ResponseType.Code,
-    redirectUri,
-    usePKCE: true,
-  });
-
-  useEffect(() => {
-    if (!response) return;
-
-    if (response.type === 'success') {
-      const idToken = response.authentication?.idToken;
-
-      if (idToken) {
-        handleGoogleSignIn(idToken);
-      } else {
-        Alert.alert('Google Sign-In Error', 'No ID token returned. Please try again.');
-      }
-    } else if (response.type === 'error') {
-      const msg =
-        (response.error as any)?.message ||
-        (response.error as any)?.description ||
-        'Google sign-in failed. Please try again.';
-      Alert.alert('Google Sign-In Failed', msg);
+  const handleGoogleSignIn = async () => {
+    if (isExpoGo) {
+      Alert.alert(
+        'Google Sign-In Unavailable',
+        'Google Sign-In is not supported in Expo Go. Please use email/password, or use the production app build.'
+      );
+      return;
     }
-  }, [response]);
-
-  const handleGoogleSignIn = async (idToken: string) => {
     setIsLoading(true);
     try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken;
+      if (!idToken) throw new Error('No ID token returned from Google.');
       await signInWithGoogle(idToken);
     } catch (error: any) {
-      Alert.alert('Sign-Up Failed', error.message);
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) return;
+      if (error.code === statusCodes.IN_PROGRESS) return;
+      Alert.alert('Sign-Up Failed', error.message || 'Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -261,23 +239,7 @@ export const SignUpScreen: React.FC = () => {
                 {/* Google Sign-Up */}
                 <Button
                   title="Continue with Google"
-                  onPress={() => {
-                    if (isExpoGo) {
-                      Alert.alert(
-                        'Google Sign-In Unavailable',
-                        'Google Sign-In is not supported in Expo Go due to OAuth restrictions. Please use email/password, or use the production app build.'
-                      );
-                      return;
-                    }
-                    if (googleNotConfigured) {
-                      Alert.alert(
-                        'Google Not Configured',
-                        'Open src/config/google.ts and set webClientId to your Firebase Web client ID.'
-                      );
-                      return;
-                    }
-                    promptAsync();
-                  }}
+                  onPress={handleGoogleSignIn}
                   variant="outline"
                   fullWidth
                   size="large"
