@@ -61,25 +61,24 @@ export const SignInScreen: React.FC = () => {
   // Detect if the developer still needs to set the web client ID
   const googleNotConfigured = GOOGLE_CONFIG.webClientId.startsWith('PASTE_');
 
-  // Google Sign-In — authorization code flow (implicit/IdToken flow is
-  // blocked by Google for OAuth clients created after 2022).
+  // Google Sign-In — PKCE code flow.
+  // Only pass clientId (web client). iosClientId/androidClientId are
+  // omitted because those OAuth clients don't exist in GCP, and
+  // expo-auth-session picks iosClientId on iOS even in Expo Go,
+  // causing Error 401: deleted_client.
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: GOOGLE_CONFIG.webClientId,
-    iosClientId: GOOGLE_CONFIG.iosClientId,
-    androidClientId: GOOGLE_CONFIG.androidClientId,
-    scopes: [...GOOGLE_CONFIG.scopes, 'openid'],
+    scopes: ['openid', 'profile', 'email'],
     responseType: ResponseType.Code,
     redirectUri: GOOGLE_CONFIG.expoRedirectUri,
-    usePKCE: false,
+    usePKCE: true,
   });
 
   useEffect(() => {
     if (!response) return;
 
     if (response.type === 'success') {
-      const idToken =
-        response.authentication?.idToken ??
-        (response.params as any)?.id_token;
+      const idToken = response.authentication?.idToken;
 
       if (idToken) {
         handleGoogleSignIn(idToken);

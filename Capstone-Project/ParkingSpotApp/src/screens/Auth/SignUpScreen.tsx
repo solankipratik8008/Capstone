@@ -73,21 +73,17 @@ export const SignUpScreen: React.FC = () => {
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: GOOGLE_CONFIG.webClientId,
-    iosClientId: GOOGLE_CONFIG.iosClientId,
-    androidClientId: GOOGLE_CONFIG.androidClientId,
-    scopes: [...GOOGLE_CONFIG.scopes, 'openid'],
+    scopes: ['openid', 'profile', 'email'],
     responseType: ResponseType.Code,
     redirectUri: GOOGLE_CONFIG.expoRedirectUri,
-    usePKCE: false,
+    usePKCE: true,
   });
 
   useEffect(() => {
     if (!response) return;
 
     if (response.type === 'success') {
-      const idToken =
-        response.authentication?.idToken ??
-        (response.params as any)?.id_token;
+      const idToken = response.authentication?.idToken;
 
       if (idToken) {
         handleGoogleSignIn(idToken);
