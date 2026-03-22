@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { ResponseType } from 'expo-auth-session';
+import { ResponseType, makeRedirectUri } from 'expo-auth-session';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import Constants from 'expo-constants';
@@ -61,16 +61,19 @@ export const SignInScreen: React.FC = () => {
   // Detect if the developer still needs to set the web client ID
   const googleNotConfigured = GOOGLE_CONFIG.webClientId.startsWith('PASTE_');
 
-  // Google Sign-In — PKCE code flow.
-  // Only pass clientId (web client). iosClientId/androidClientId are
-  // omitted because those OAuth clients don't exist in GCP, and
-  // expo-auth-session picks iosClientId on iOS even in Expo Go,
-  // causing Error 401: deleted_client.
+  // In a real dev/prod build, use the app's custom scheme as redirect URI.
+  // In Expo Go, use the auth proxy (Google Sign-In will show an info alert anyway).
+  const redirectUri = isExpoGo
+    ? GOOGLE_CONFIG.expoRedirectUri
+    : makeRedirectUri({ scheme: 'com.parkspot.app', path: 'oauth' });
+
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: GOOGLE_CONFIG.webClientId,
+    iosClientId: GOOGLE_CONFIG.iosClientId,
+    androidClientId: GOOGLE_CONFIG.androidClientId,
     scopes: ['openid', 'profile', 'email'],
     responseType: ResponseType.Code,
-    redirectUri: GOOGLE_CONFIG.expoRedirectUri,
+    redirectUri,
     usePKCE: true,
   });
 

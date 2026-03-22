@@ -44,14 +44,15 @@
         }
       },
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.DETECT_SCREEN_CAPTURE",
-        "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -80,6 +81,12 @@
           "enableGooglePay": true
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0bfa799c-c50b-43eb-ad19-2d0687929d58"
+      }
+    },
+    "owner": "pratik4094"
   }
 }

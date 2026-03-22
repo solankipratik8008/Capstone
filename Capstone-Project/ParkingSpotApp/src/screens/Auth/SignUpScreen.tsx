@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { ResponseType } from 'expo-auth-session';
+import { ResponseType, makeRedirectUri } from 'expo-auth-session';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import Constants from 'expo-constants';
@@ -71,11 +71,17 @@ export const SignUpScreen: React.FC = () => {
       .catch(() => setAppleAvailable(false));
   }, []);
 
+  const redirectUri = isExpoGo
+    ? GOOGLE_CONFIG.expoRedirectUri
+    : makeRedirectUri({ scheme: 'com.parkspot.app', path: 'oauth' });
+
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: GOOGLE_CONFIG.webClientId,
+    iosClientId: GOOGLE_CONFIG.iosClientId,
+    androidClientId: GOOGLE_CONFIG.androidClientId,
     scopes: ['openid', 'profile', 'email'],
     responseType: ResponseType.Code,
-    redirectUri: GOOGLE_CONFIG.expoRedirectUri,
+    redirectUri,
     usePKCE: true,
   });
 
