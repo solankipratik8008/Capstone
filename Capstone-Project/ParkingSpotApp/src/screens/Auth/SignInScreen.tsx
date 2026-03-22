@@ -229,12 +229,19 @@ export const SignInScreen: React.FC = () => {
 
                 {/* Google Sign-In */}
                 <Button
-                  title={googleNotConfigured ? 'Google (see setup guide)' : 'Continue with Google'}
+                  title="Continue with Google"
                   onPress={() => {
+                    if (isExpoGo) {
+                      Alert.alert(
+                        'Google Sign-In Unavailable',
+                        'Google Sign-In is not supported in Expo Go due to OAuth restrictions. Please use email/password, or use the production app build.'
+                      );
+                      return;
+                    }
                     if (googleNotConfigured) {
                       Alert.alert(
                         'Google Not Configured',
-                        'Open src/config/google.ts and set webClientId to your Firebase Web client ID.\n\nFirebase Console → Authentication → Sign-in method → Google → Web SDK configuration → Web client ID'
+                        'Open src/config/google.ts and set webClientId to your Firebase Web client ID.'
                       );
                       return;
                     }
@@ -244,7 +251,7 @@ export const SignInScreen: React.FC = () => {
                   fullWidth
                   size="large"
                   icon={<Ionicons name="logo-google" size={20} color={COLORS.error} />}
-                  disabled={(!request && !googleNotConfigured) || isLoading}
+                  disabled={isLoading}
                   style={styles.socialButton}
                 />
 
