@@ -45,12 +45,9 @@ export const GOOGLE_CONFIG = {
   // URL scheme registered in app.json CFBundleURLSchemes
   iosClientId: '647587380585-lfqvq6ruaqi8hnsik291oejvenf3n0jc.apps.googleusercontent.com',
 
-  // Android OAuth client (type: Android) — fill in after EAS build:
-  // 1. Run: eas credentials -p android  → copy SHA-1
-  // 2. GCP → Create credentials → OAuth client ID → Android
-  //    Package: com.parkspot.app, SHA-1: <paste>
-  // 3. Copy the new client ID here
-  androidClientId: '647587380585-ao58ugh9hdr1u8h0fff139s882u13138.apps.googleusercontent.com',
+  // Android OAuth client (type: Android) — package: com.parkspot.app
+  // SHA-1: 0C:EC:EC:C4:98:E8:13:BF:41:3B:AA:5A:10:08:41:B3:94:A5:0C:54
+  androidClientId: '647587380585-d4mjmoobo5ooi6kks4tsipdethneafd7.apps.googleusercontent.com',
 
   // Expo auth proxy — only used in Expo Go (shows info alert, not functional)
   expoRedirectUri: 'https://auth.expo.io/@pratik4094/parkingspotapp',
