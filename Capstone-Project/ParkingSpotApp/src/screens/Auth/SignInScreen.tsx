@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { ResponseType, makeRedirectUri } from 'expo-auth-session';
+import { ResponseType } from 'expo-auth-session';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import Constants from 'expo-constants';
@@ -61,11 +61,11 @@ export const SignInScreen: React.FC = () => {
   // Detect if the developer still needs to set the web client ID
   const googleNotConfigured = GOOGLE_CONFIG.webClientId.startsWith('PASTE_');
 
-  // In a real dev/prod build, use the app's custom scheme as redirect URI.
-  // In Expo Go, use the auth proxy (Google Sign-In will show an info alert anyway).
+  // Expo Go: use proxy URI (button shows info alert, not functional)
+  // Native build (iOS/Android): use reverse-client-ID scheme per platform
   const redirectUri = isExpoGo
     ? GOOGLE_CONFIG.expoRedirectUri
-    : makeRedirectUri({ scheme: 'com.parkspot.app', path: 'oauth' });
+    : GOOGLE_CONFIG.nativeRedirectUri;
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: GOOGLE_CONFIG.webClientId,
