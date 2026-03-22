@@ -18,6 +18,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import { ResponseType } from 'expo-auth-session';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
+import Constants from 'expo-constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -45,12 +46,20 @@ export const SignInScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
 
-  // Check Apple availability once on mount
+  // Apple Sign-In requires a real development/production build.
+  // In Expo Go the token audience is "host.exp.Exponent", which Firebase
+  // rejects. Only enable Apple button when NOT in Expo Go.
+  const isExpoGo = Constants.appOwnership === 'expo';
+
   useEffect(() => {
+    if (isExpoGo) return; // will never work in Expo Go
     AppleAuthentication.isAvailableAsync()
       .then(setAppleAvailable)
       .catch(() => setAppleAvailable(false));
   }, []);
+
+  // Detect if the developer still needs to set the web client ID
+  const googleNotConfigured = GOOGLE_CONFIG.webClientId.startsWith('PASTE_');
 
   // Google Sign-In — implicit IdToken flow through the Expo auth proxy.
   // webClientId must be the Web client from Firebase Console →
@@ -221,13 +230,22 @@ export const SignInScreen: React.FC = () => {
 
                 {/* Google Sign-In */}
                 <Button
-                  title="Continue with Google"
-                  onPress={() => promptAsync()}
+                  title={googleNotConfigured ? 'Google (see setup guide)' : 'Continue with Google'}
+                  onPress={() => {
+                    if (googleNotConfigured) {
+                      Alert.alert(
+                        'Google Not Configured',
+                        'Open src/config/google.ts and set webClientId to your Firebase Web client ID.\n\nFirebase Console → Authentication → Sign-in method → Google → Web SDK configuration → Web client ID'
+                      );
+                      return;
+                    }
+                    promptAsync();
+                  }}
                   variant="outline"
                   fullWidth
                   size="large"
                   icon={<Ionicons name="logo-google" size={20} color={COLORS.error} />}
-                  disabled={!request || isLoading}
+                  disabled={(!request && !googleNotConfigured) || isLoading}
                   style={styles.socialButton}
                 />
 
