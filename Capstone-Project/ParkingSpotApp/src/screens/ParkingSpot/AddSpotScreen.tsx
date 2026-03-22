@@ -325,7 +325,7 @@ export const AddSpotScreen: React.FC = () => {
           zipCode: values.zipCode,
         },
         pricePerHour: parseFloat(values.pricePerHour),
-        pricePerDay: values.pricePerDay ? parseFloat(values.pricePerDay) : undefined,
+        pricePerDay: values.pricePerDay ? parseFloat(values.pricePerDay) : null,
         imageURLs,
         isAvailable,
         spotType: selectedSpotType,
