@@ -14,7 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+// GoogleSignin is loaded lazily via require() inside handlers to avoid crashing Expo Go
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import Constants from 'expo-constants';
@@ -57,10 +57,13 @@ export const SignInScreen: React.FC = () => {
       .catch(() => setAppleAvailable(false));
   }, []);
 
-  // Configure native Google Sign-In on mount
+  // Configure native Google Sign-In on mount (lazy require so Expo Go doesn't crash)
   useEffect(() => {
     if (isExpoGo) return;
-    GoogleSignin.configure({ webClientId: GOOGLE_CONFIG.webClientId });
+    try {
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      GoogleSignin.configure({ webClientId: GOOGLE_CONFIG.webClientId });
+    } catch {}
   }, []);
 
   const handleGoogleSignIn = async () => {
@@ -72,6 +75,13 @@ export const SignInScreen: React.FC = () => {
       return;
     }
     setIsLoading(true);
+    let GoogleSignin: any, statusCodes: any;
+    try {
+      ({ GoogleSignin, statusCodes } = require('@react-native-google-signin/google-signin'));
+    } catch {
+      setIsLoading(false);
+      return;
+    }
     try {
       await GoogleSignin.hasPlayServices();
       const userInfo = await GoogleSignin.signIn();
