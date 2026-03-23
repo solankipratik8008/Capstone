@@ -16,6 +16,8 @@ import HelpCenterScreen from '../screens/Settings/HelpCenterScreen';
 import TermsOfServiceScreen from '../screens/Settings/TermsOfServiceScreen';
 import PrivacyPolicyScreen from '../screens/Settings/PrivacyPolicyScreen';
 import PaymentMethodsScreen from '../screens/Settings/PaymentMethodsScreen';
+import { ParkingPassScreen } from '../screens/Booking/ParkingPassScreen';
+import GateScannerScreen from '../screens/Booking/GateScannerScreen';
 import { COLORS } from '../constants';
 
 export type ProfileStackParamList = {
@@ -30,6 +32,8 @@ export type ProfileStackParamList = {
   TermsOfService: undefined;
   PrivacyPolicy: undefined;
   PaymentMethods: undefined;
+  ParkingPass: { bookingId: string };
+  GateScanner: { qrValue: string };
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -54,6 +58,12 @@ export const ProfileStackNavigator: React.FC = () => {
       <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
       <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
+      <Stack.Screen name="ParkingPass" component={ParkingPassScreen} />
+      <Stack.Screen
+        name="GateScanner"
+        component={GateScannerScreen}
+        options={{ animation: 'fade' }}
+      />
     </Stack.Navigator>
   );
 };

@@ -1,39 +1,25 @@
 /**
- * Home Map Screen
- * Displays user-listed spots AND nearby paid parking lots on a map.
+ * Home Map Screen — SpotHero-style with radius filter + preview card
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Dimensions,
-  FlatList,
-  Animated,
-  Platform,
-  TextInput,
-  Keyboard,
+  View, Text, StyleSheet, TouchableOpacity,
+  Dimensions, FlatList, Platform, TextInput, Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Region, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { ParkingMarker, PlacesMarker, UserLocationMarker } from '../../components/maps';
+import { ParkingMarker, PlacesMarker, UserLocationMarker, SpotPreviewCard } from '../../components/maps';
+import type { PreviewItem } from '../../components/maps';
 import { ParkingSpotCard } from '../../components/parking';
 import { Loading } from '../../components/common';
 import { useParkingSpots, useLocation } from '../../context';
 import {
-  COLORS,
-  SPACING,
-  FONTS,
-  BORDER_RADIUS,
-  SHADOWS,
-  DEFAULT_REGION,
-  ParkingSpot,
+  COLORS, SPACING, FONTS, BORDER_RADIUS, SHADOWS, DEFAULT_REGION, ParkingSpot,
 } from '../../constants';
 import { MapStackParamList } from '../../navigation/MapStackNavigator';
 import { fetchNearbyParking, NearbyPlace } from '../../services/places';
@@ -44,10 +30,18 @@ const CARD_WIDTH = width * 0.8;
 type NavigationProp = NativeStackNavigationProp<MapStackParamList>;
 type FilterType = 'all' | 'spots' | 'places';
 
-const FILTERS: { key: FilterType; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'all',    label: 'All',       icon: 'layers-outline' },
-  { key: 'spots',  label: 'ParkSpot',  icon: 'home-outline' },
-  { key: 'places', label: 'Paid Lots', icon: 'business-outline' },
+const RADIUS_OPTIONS: { label: string; meters: number }[] = [
+  { label: '200 m', meters: 200 },
+  { label: '500 m', meters: 500 },
+  { label: '1 km',  meters: 1000 },
+  { label: '2 km',  meters: 2000 },
+  { label: '5 km',  meters: 5000 },
+];
+
+const TYPE_FILTERS: { key: FilterType; icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
+  { key: 'all',    icon: 'layers-outline',   label: 'All' },
+  { key: 'spots',  icon: 'home-outline',     label: 'ParkSpot' },
+  { key: 'places', icon: 'business-outline', label: 'Paid Lots' },
 ];
 
 export const HomeMapScreen: React.FC = () => {
@@ -58,28 +52,27 @@ export const HomeMapScreen: React.FC = () => {
   const { spots, isLoading: spotsLoading } = useParkingSpots();
   const { userLocation, getCurrentLocation, calculateDistance } = useLocation();
 
-  const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [showList, setShowList] = useState(false);
 
-  // Filter state
+  // Filters
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [selectedRadius, setSelectedRadius] = useState(1000); // metres
 
-  // Search state
+  // Search
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [filteredSpots, setFilteredSpots] = useState<ParkingSpot[]>([]);
 
-  // Nearby places state
+  // Places
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
 
-  const scrollX = useRef(new Animated.Value(0)).current;
+  // Preview card
+  const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null);
 
-  // Get user location on mount
+  // ── Location ──────────────────────────────────────────
   useEffect(() => { getCurrentLocation(); }, []);
 
-  // Animate to user location when available
   useEffect(() => {
     if (userLocation && mapReady && mapRef.current) {
       mapRef.current.animateToRegion({
@@ -91,31 +84,28 @@ export const HomeMapScreen: React.FC = () => {
     }
   }, [userLocation, mapReady]);
 
-  // Fetch nearby paid parking lots when location is available
+  // ── Fetch nearby places whenever location or radius changes ───
   useEffect(() => {
     if (!userLocation) return;
-    fetchNearbyParking(userLocation.latitude, userLocation.longitude)
+    fetchNearbyParking(userLocation.latitude, userLocation.longitude, selectedRadius)
       .then(setNearbyPlaces)
-      .catch(() => {}); // graceful fail — Places API key may need enabling
-  }, [userLocation?.latitude, userLocation?.longitude]);
+      .catch(() => {});
+  }, [userLocation?.latitude, userLocation?.longitude, selectedRadius]);
 
-  // Filter spots based on search query
+  // ── Search filter ─────────────────────────────────────
   useEffect(() => {
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const results = spots.filter(
-        (spot) =>
-          spot.title.toLowerCase().includes(query) ||
-          spot.description.toLowerCase().includes(query) ||
-          spot.location.address?.toLowerCase().includes(query) ||
-          spot.location.city?.toLowerCase().includes(query)
+      const q = searchQuery.toLowerCase();
+      const results = spots.filter((s) =>
+        s.title.toLowerCase().includes(q) ||
+        s.description.toLowerCase().includes(q) ||
+        s.location.address?.toLowerCase().includes(q) ||
+        s.location.city?.toLowerCase().includes(q)
       );
       if (userLocation) {
-        results.sort((a, b) => {
-          const distA = calculateDistance(a.location) ?? Infinity;
-          const distB = calculateDistance(b.location) ?? Infinity;
-          return distA - distB;
-        });
+        results.sort((a, b) =>
+          (calculateDistance(a.location) ?? Infinity) - (calculateDistance(b.location) ?? Infinity)
+        );
       }
       setFilteredSpots(results);
       setIsSearching(true);
@@ -125,102 +115,80 @@ export const HomeMapScreen: React.FC = () => {
     }
   }, [searchQuery, spots, userLocation, calculateDistance]);
 
-  // What shows on the map depends on filter
   const displaySpots  = activeFilter === 'places' ? [] : spots;
   const displayPlaces = activeFilter === 'spots'  ? [] : nearbyPlaces;
 
-  // Handle user-spot marker press
-  const handleMarkerPress = useCallback((spot: ParkingSpot) => {
-    setSelectedSpotId(spot.id);
-    setSelectedPlaceId(null);
-    setShowList(true);
-    const index = spots.findIndex((s) => s.id === spot.id);
-    if (index !== -1 && flatListRef.current) {
-      flatListRef.current.scrollToIndex({ index, animated: true });
-    }
+  // ── Handlers ──────────────────────────────────────────
+  const handleSpotMarkerPress = useCallback((spot: ParkingSpot) => {
+    const distance = calculateDistance(spot.location);
+    setPreviewItem({ kind: 'spot', data: spot, distance });
+    setShowList(false);
     mapRef.current?.animateToRegion({
-      latitude: spot.location.latitude,
-      longitude: spot.location.longitude,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
+      latitude: spot.location.latitude, longitude: spot.location.longitude,
+      latitudeDelta: 0.008, longitudeDelta: 0.008,
     });
-  }, [spots]);
+  }, [calculateDistance]);
 
-  // Handle places marker press
-  const handlePlacePress = useCallback((place: NearbyPlace) => {
-    setSelectedPlaceId(place.id);
-    setSelectedSpotId(null);
+  const handlePlaceMarkerPress = useCallback((place: NearbyPlace) => {
+    const distance = userLocation
+      ? calculateDistance({ latitude: place.latitude, longitude: place.longitude } as any)
+      : undefined;
+    setPreviewItem({ kind: 'place', data: place, distance: distance ?? undefined });
+    setShowList(false);
     mapRef.current?.animateToRegion({
-      latitude: place.latitude,
-      longitude: place.longitude,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
+      latitude: place.latitude, longitude: place.longitude,
+      latitudeDelta: 0.008, longitudeDelta: 0.008,
     });
-  }, []);
-
-  const handleSearchResultPress = useCallback((spot: ParkingSpot) => {
-    setSearchQuery('');
-    handleMarkerPress(spot);
-    Keyboard.dismiss();
-  }, [handleMarkerPress]);
-
-  const handleCardPress = useCallback((spotId: string) => {
-    navigation.navigate('SpotDetails', { spotId });
-  }, [navigation]);
-
-  const handleCenterLocation = useCallback(async () => {
-    const location = await getCurrentLocation();
-    if (location && mapRef.current) {
-      mapRef.current.animateToRegion({
-        latitude: location.latitude,
-        longitude: location.longitude,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
-      });
-    }
-  }, [getCurrentLocation]);
+  }, [calculateDistance, userLocation]);
 
   const handleMapPress = useCallback(() => {
-    setSelectedSpotId(null);
-    setSelectedPlaceId(null);
+    setPreviewItem(null);
     setShowList(false);
     Keyboard.dismiss();
     setSearchQuery('');
   }, []);
 
-  const renderSpotCard = useCallback(({ item }: { item: ParkingSpot }) => {
-    const distance = calculateDistance(item.location);
-    return (
-      <View style={styles.cardContainer}>
-        <ParkingSpotCard
-          spot={item}
-          distance={distance}
-          onPress={() => handleCardPress(item.id)}
-          horizontal
-        />
-      </View>
-    );
-  }, [calculateDistance, handleCardPress]);
+  const handleCenterLocation = useCallback(async () => {
+    const loc = await getCurrentLocation();
+    if (loc && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: loc.latitude, longitude: loc.longitude,
+        latitudeDelta: 0.02, longitudeDelta: 0.02,
+      });
+    }
+  }, [getCurrentLocation]);
+
+  const handleSearchResultPress = useCallback((spot: ParkingSpot) => {
+    setSearchQuery('');
+    handleSpotMarkerPress(spot);
+    Keyboard.dismiss();
+  }, [handleSpotMarkerPress]);
+
+  const renderSpotCard = useCallback(({ item }: { item: ParkingSpot }) => (
+    <View style={{ width: CARD_WIDTH, marginRight: SPACING.md }}>
+      <ParkingSpotCard
+        spot={item}
+        distance={calculateDistance(item.location)}
+        onPress={() => navigation.navigate('SpotDetails', { spotId: item.id })}
+        horizontal
+      />
+    </View>
+  ), [calculateDistance, navigation]);
 
   const renderSearchItem = useCallback(({ item }: { item: ParkingSpot }) => (
-    <TouchableOpacity
-      style={styles.searchItem}
-      onPress={() => handleSearchResultPress(item)}
-    >
+    <TouchableOpacity style={styles.searchItem} onPress={() => handleSearchResultPress(item)}>
       <View style={styles.searchItemIcon}>
-        <Ionicons name="location" size={18} color={COLORS.primary} />
+        <Ionicons name="location" size={16} color={COLORS.primary} />
       </View>
-      <View style={styles.searchItemContent}>
+      <View style={{ flex: 1 }}>
         <Text style={styles.searchItemTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.searchItemSubtitle} numberOfLines={1}>
+        <Text style={styles.searchItemSub} numberOfLines={1}>
           {item.location.address || 'Unknown address'}
         </Text>
       </View>
-      <View style={styles.searchItemDistance}>
-        <Text style={styles.distanceText}>
-          {calculateDistance(item.location)?.toFixed(1)} km
-        </Text>
-      </View>
+      <Text style={styles.searchItemDist}>
+        {calculateDistance(item.location)?.toFixed(1)} km
+      </Text>
     </TouchableOpacity>
   ), [calculateDistance, handleSearchResultPress]);
 
@@ -239,52 +207,38 @@ export const HomeMapScreen: React.FC = () => {
         onPress={handleMapPress}
       >
         {userLocation && (
-          <UserLocationMarker
-            coordinate={{
-              latitude: userLocation.latitude,
-              longitude: userLocation.longitude,
-            }}
-          />
+          <UserLocationMarker coordinate={{ latitude: userLocation.latitude, longitude: userLocation.longitude }} />
         )}
 
-        {/* User-listed ParkSpot markers */}
         {displaySpots.map((spot) => (
           <ParkingMarker
             key={spot.id}
             spot={spot}
-            selected={selectedSpotId === spot.id}
-            onPress={() => handleMarkerPress(spot)}
-            onDetailsPress={() => handleCardPress(spot.id)}
+            selected={previewItem?.kind === 'spot' && previewItem.data.id === spot.id}
+            onPress={() => handleSpotMarkerPress(spot)}
+            onDetailsPress={() => navigation.navigate('SpotDetails', { spotId: spot.id })}
           />
         ))}
 
-        {/* Google Places paid parking lot markers */}
         {displayPlaces.map((place) => (
           <PlacesMarker
             key={place.id}
             place={place}
-            selected={selectedPlaceId === place.id}
-            onPress={() => handlePlacePress(place)}
+            selected={previewItem?.kind === 'place' && previewItem.data.id === place.id}
+            onPress={() => handlePlaceMarkerPress(place)}
           />
         ))}
       </MapView>
 
-      {/* Header with search + filter chips */}
-      <SafeAreaView style={styles.header} edges={['top']}>
+      {/* ── Header overlay ── */}
+      <SafeAreaView style={styles.headerOverlay} edges={['top']}>
         {/* Search row */}
-        <View style={styles.searchContainer}>
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => (navigation as any).navigate('ProfileTab')}
-          >
-            <Ionicons name="menu" size={22} color={COLORS.textPrimary} />
-          </TouchableOpacity>
-
+        <View style={styles.searchRow}>
           <View style={styles.searchBar}>
             <Ionicons name="search" size={18} color={COLORS.textSecondary} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search parking spots..."
+              placeholder="Search parking spots…"
               placeholderTextColor={COLORS.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -298,101 +252,115 @@ export const HomeMapScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Filter chips */}
+        {/* Radius filter */}
         {!isSearching && (
-          <View style={styles.filterRow}>
-            {FILTERS.map((f) => (
-              <TouchableOpacity
-                key={f.key}
-                style={[styles.chip, activeFilter === f.key && styles.chipActive]}
-                onPress={() => setActiveFilter(f.key)}
-                activeOpacity={0.75}
-              >
-                <Ionicons
-                  name={f.icon}
-                  size={13}
-                  color={activeFilter === f.key ? COLORS.white : COLORS.textSecondary}
-                />
-                <Text style={[styles.chipText, activeFilter === f.key && styles.chipTextActive]}>
-                  {f.label}
-                </Text>
-                {f.key === 'places' && nearbyPlaces.length > 0 && (
-                  <View style={[styles.chipBadge, activeFilter === f.key && styles.chipBadgeActive]}>
-                    <Text style={[styles.chipBadgeText, activeFilter === f.key && styles.chipBadgeTextActive]}>
-                      {nearbyPlaces.length}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+          <View style={styles.filterScroll}>
+            {/* Radius pills */}
+            <View style={styles.chipRow}>
+              <Ionicons name="radio-outline" size={14} color={COLORS.textMuted} style={{ marginRight: 4 }} />
+              {RADIUS_OPTIONS.map((r) => (
+                <TouchableOpacity
+                  key={r.meters}
+                  style={[styles.chip, selectedRadius === r.meters && styles.chipActive]}
+                  onPress={() => setSelectedRadius(r.meters)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.chipText, selectedRadius === r.meters && styles.chipTextActive]}>
+                    {r.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-            {/* Legend dots */}
-            <View style={styles.legendRow}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.primary }]} />
-              <View style={[styles.legendDot, { backgroundColor: COLORS.places }]} />
+            {/* Type filter */}
+            <View style={[styles.chipRow, { marginTop: SPACING.xs }]}>
+              {TYPE_FILTERS.map((f) => (
+                <TouchableOpacity
+                  key={f.key}
+                  style={[styles.chip, styles.chipType, activeFilter === f.key && styles.chipTypeActive]}
+                  onPress={() => setActiveFilter(f.key)}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons
+                    name={f.icon}
+                    size={12}
+                    color={activeFilter === f.key ? COLORS.white : COLORS.textSecondary}
+                  />
+                  <Text style={[styles.chipText, styles.chipTypeText, activeFilter === f.key && styles.chipTextActive]}>
+                    {f.label}
+                  </Text>
+                  {f.key === 'places' && nearbyPlaces.length > 0 && (
+                    <View style={styles.countDot}>
+                      <Text style={styles.countDotText}>{nearbyPlaces.length}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         )}
 
         {/* Search results */}
         {isSearching && filteredSpots.length > 0 && (
-          <View style={styles.searchResultsContainer}>
+          <View style={styles.searchResultsBox}>
             <FlatList
               data={filteredSpots.slice(0, 5)}
               renderItem={renderSearchItem}
-              keyExtractor={(item) => item.id}
-              style={styles.searchResultsList}
+              keyExtractor={(i) => i.id}
               keyboardShouldPersistTaps="always"
             />
           </View>
         )}
       </SafeAreaView>
 
-      {/* Floating action buttons */}
-      {!isSearching && (
-        <View style={styles.floatingButtons}>
-          <TouchableOpacity style={styles.floatingButton} onPress={handleCenterLocation}>
-            <Ionicons name="locate" size={22} color={COLORS.primary} />
+      {/* ── Floating locate button ── */}
+      {!isSearching && !previewItem && (
+        <View style={styles.fab}>
+          <TouchableOpacity style={styles.fabBtn} onPress={handleCenterLocation}>
+            <Ionicons name="locate" size={22} color={COLORS.white} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.floatingButton}
-            onPress={() => setShowList(!showList)}
-          >
-            <Ionicons name={showList ? 'map' : 'list'} size={22} color={COLORS.primary} />
+          <TouchableOpacity style={[styles.fabBtn, styles.fabBtnOutline]} onPress={() => setShowList(!showList)}>
+            <Ionicons name={showList ? 'map' : 'list'} size={20} color={COLORS.primary} />
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Bottom cards — only user spots */}
-      {showList && !isSearching && activeFilter !== 'places' && spots.length > 0 && (
-        <View style={styles.cardListContainer}>
+      {/* ── Bottom card list ── */}
+      {showList && !isSearching && !previewItem && activeFilter !== 'places' && spots.length > 0 && (
+        <View style={styles.cardList}>
           <View style={styles.cardListHeader}>
-            <Text style={styles.cardListTitle}>
-              {spots.length} spot{spots.length !== 1 ? 's' : ''} nearby
-            </Text>
+            <Text style={styles.cardListTitle}>{spots.length} spot{spots.length !== 1 ? 's' : ''} nearby</Text>
           </View>
           <FlatList
             ref={flatListRef}
             data={spots}
             renderItem={renderSpotCard}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(i) => i.id}
             horizontal
             showsHorizontalScrollIndicator={false}
             snapToInterval={CARD_WIDTH + SPACING.md}
             decelerationRate="fast"
-            contentContainerStyle={styles.cardListContent}
-            onScroll={Animated.event(
-              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-              { useNativeDriver: false }
-            )}
+            contentContainerStyle={{ paddingHorizontal: SPACING.lg }}
           />
         </View>
       )}
 
-      {/* Loading overlay */}
+      {/* ── Spot preview card ── */}
+      {previewItem && (
+        <SpotPreviewCard
+          item={previewItem}
+          onClose={() => setPreviewItem(null)}
+          onViewDetails={
+            previewItem.kind === 'spot'
+              ? () => navigation.navigate('SpotDetails', { spotId: (previewItem.data as ParkingSpot).id })
+              : undefined
+          }
+        />
+      )}
+
       {spotsLoading && (
         <View style={styles.loadingOverlay}>
-          <Loading text="Loading spots..." />
+          <Loading text="Loading spots…" />
         </View>
       )}
     </View>
@@ -400,220 +368,96 @@ export const HomeMapScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  map: { flex: 1 },
+
+  headerOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    paddingHorizontal: SPACING.md, paddingTop: SPACING.sm,
   },
-  map: {
-    flex: 1,
-  },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
-  },
-  menuButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...SHADOWS.md,
-  },
+
+  searchRow: { marginBottom: SPACING.xs },
   searchBar: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 44,
-    backgroundColor: COLORS.white,
-    borderRadius: 22,
-    paddingHorizontal: SPACING.md,
+    flexDirection: 'row', alignItems: 'center',
+    height: 46, backgroundColor: COLORS.white,
+    borderRadius: 23, paddingHorizontal: SPACING.md,
     ...SHADOWS.md,
   },
   searchInput: {
-    flex: 1,
-    marginLeft: SPACING.sm,
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textPrimary,
+    flex: 1, marginLeft: SPACING.sm,
+    fontSize: FONTS.sizes.md, color: COLORS.textPrimary,
   },
 
-  // Filter chips
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    paddingLeft: SPACING.sm,
-  },
+  filterScroll: {},
+  chipRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 7,
+    paddingHorizontal: SPACING.md, paddingVertical: 6,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.white,
-    ...SHADOWS.sm,
+    backgroundColor: COLORS.white, ...SHADOWS.sm,
   },
-  chipActive: {
-    backgroundColor: COLORS.primary,
+  chipActive: { backgroundColor: COLORS.primary },
+  chipType: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  chipTypeActive: { backgroundColor: COLORS.primary },
+  chipTypeText: {},
+  chipText: { fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.medium, color: COLORS.textSecondary },
+  chipTextActive: { color: COLORS.white },
+  countDot: {
+    backgroundColor: COLORS.white + '33', borderRadius: 8,
+    minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
   },
-  chipText: {
-    fontSize: FONTS.sizes.sm,
-    fontWeight: FONTS.weights.medium,
-    color: COLORS.textSecondary,
-  },
-  chipTextActive: {
-    color: COLORS.white,
-  },
-  chipBadge: {
-    backgroundColor: COLORS.primary + '22',
-    borderRadius: BORDER_RADIUS.full,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  chipBadgeActive: {
-    backgroundColor: COLORS.white + '33',
-  },
-  chipBadgeText: {
-    fontSize: 10,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.primary,
-  },
-  chipBadgeTextActive: {
-    color: COLORS.white,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    gap: 4,
-    marginLeft: 'auto',
-    paddingRight: SPACING.sm,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
+  countDotText: { fontSize: 9, fontWeight: '700', color: COLORS.white },
 
-  // Search results
-  searchResultsContainer: {
-    marginTop: SPACING.xs,
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
-    maxHeight: 300,
-    ...SHADOWS.md,
-    overflow: 'hidden',
-  },
-  searchResultsList: {
-    paddingVertical: SPACING.xs,
+  searchResultsBox: {
+    marginTop: SPACING.xs, backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg, maxHeight: 280,
+    ...SHADOWS.md, overflow: 'hidden',
   },
   searchItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[100],
+    flexDirection: 'row', alignItems: 'center',
+    padding: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.gray[100],
   },
   searchItemIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: COLORS.primary + '18',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: COLORS.primary + '15',
+    alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md,
   },
-  searchItemContent: {
-    flex: 1,
-  },
-  searchItemTitle: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.semibold,
-    color: COLORS.textPrimary,
-    marginBottom: 2,
-  },
-  searchItemSubtitle: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textMuted,
-  },
-  searchItemDistance: {
-    marginLeft: SPACING.sm,
-    backgroundColor: COLORS.gray[100],
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 3,
-    borderRadius: BORDER_RADIUS.sm,
-  },
-  distanceText: {
-    fontSize: FONTS.sizes.xs,
-    color: COLORS.textSecondary,
-    fontWeight: FONTS.weights.medium,
+  searchItemTitle: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semibold, color: COLORS.textPrimary },
+  searchItemSub: { fontSize: FONTS.sizes.sm, color: COLORS.textMuted },
+  searchItemDist: {
+    fontSize: FONTS.sizes.xs, color: COLORS.textSecondary,
+    backgroundColor: COLORS.gray[100], borderRadius: 6,
+    paddingHorizontal: SPACING.sm, paddingVertical: 2, marginLeft: SPACING.sm,
   },
 
-  // Floating buttons
-  floatingButtons: {
-    position: 'absolute',
-    right: SPACING.lg,
-    bottom: 220,
-    gap: SPACING.sm,
-  },
-  floatingButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
+  fab: { position: 'absolute', right: SPACING.lg, bottom: 200, gap: SPACING.sm },
+  fabBtn: {
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center',
     ...SHADOWS.md,
   },
-
-  // Bottom card list
-  cardListContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingBottom: SPACING.lg,
-    backgroundColor: 'transparent',
-  },
-  cardListHeader: {
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-  },
-  cardListTitle: {
-    fontSize: FONTS.sizes.sm,
-    fontWeight: FONTS.weights.semibold,
-    color: COLORS.textPrimary,
+  fabBtnOutline: {
     backgroundColor: COLORS.white,
+    borderWidth: 1.5, borderColor: COLORS.primary,
+  },
+
+  cardList: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingBottom: SPACING.xl,
+  },
+  cardListHeader: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.sm },
+  cardListTitle: {
+    fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.semibold,
+    color: COLORS.textPrimary, backgroundColor: COLORS.white,
     alignSelf: 'flex-start',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 5,
-    borderRadius: BORDER_RADIUS.full,
-    ...SHADOWS.sm,
-  },
-  cardListContent: {
-    paddingHorizontal: SPACING.lg,
-  },
-  cardContainer: {
-    width: CARD_WIDTH,
-    marginRight: SPACING.md,
+    paddingHorizontal: SPACING.md, paddingVertical: 5,
+    borderRadius: BORDER_RADIUS.full, ...SHADOWS.sm,
   },
 
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    alignItems: 'center', justifyContent: 'center',
   },
 });
 
