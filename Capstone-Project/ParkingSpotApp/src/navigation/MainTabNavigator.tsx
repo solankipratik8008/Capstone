@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -53,13 +53,18 @@ export const MainTabNavigator: React.FC = () => {
               iconName = 'ellipse';
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return (
+            <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
+              <Ionicons name={iconName} size={22} color={color} />
+            </View>
+          );
         },
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.gray[400],
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabBarLabel,
         tabBarHideOnKeyboard: true,
+        tabBarItemStyle: styles.tabBarItem,
       })}
     >
       <Tab.Screen
@@ -94,13 +99,33 @@ export const MainTabNavigator: React.FC = () => {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray[200],
+    borderTopWidth: 0,
+    height: Platform.OS === 'ios' ? 82 : 65,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+    paddingTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 16,
+  },
+  tabBarItem: {
+    paddingTop: 2,
   },
   tabBarLabel: {
     fontSize: FONTS.sizes.xs,
     fontWeight: FONTS.weights.medium,
     marginTop: 2,
+  },
+  tabIconWrapper: {
+    width: 40,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabIconWrapperActive: {
+    backgroundColor: COLORS.primary + '18',
   },
 });
 

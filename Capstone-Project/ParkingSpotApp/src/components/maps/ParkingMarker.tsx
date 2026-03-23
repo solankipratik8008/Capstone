@@ -8,6 +8,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Marker, Callout } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { ParkingSpot, COLORS, SPACING, BORDER_RADIUS, FONTS, SHADOWS } from '../../constants';
+import { NearbyPlace } from '../../services/places';
 
 interface ParkingMarkerProps {
   spot: ParkingSpot;
@@ -73,6 +74,64 @@ export const ParkingMarker: React.FC<ParkingMarkerProps> = ({
             )}
           </View>
           <Text style={styles.calloutHint}>Tap for details</Text>
+        </View>
+      </Callout>
+    </Marker>
+  );
+};
+
+/**
+ * Places marker — for Google Places paid parking lots
+ */
+interface PlacesMarkerProps {
+  place: NearbyPlace;
+  selected?: boolean;
+  onPress: () => void;
+}
+
+export const PlacesMarker: React.FC<PlacesMarkerProps> = ({
+  place,
+  selected = false,
+  onPress,
+}) => {
+  return (
+    <Marker
+      coordinate={{ latitude: place.latitude, longitude: place.longitude }}
+      onPress={onPress}
+      tracksViewChanges={false}
+    >
+      <View style={[styles.placesContainer, selected && styles.markerSelected]}>
+        <View style={[styles.placesMarker, selected && styles.placesMarkerSelected]}>
+          <Text style={[styles.placesPText, selected && styles.placesPTextSelected]}>P</Text>
+        </View>
+        <View style={[styles.placesTail, selected && styles.placesTailSelected]} />
+      </View>
+
+      <Callout tooltip onPress={onPress}>
+        <View style={styles.calloutContainer}>
+          <View style={styles.placesCalloutHeader}>
+            <View style={styles.placesCalloutBadge}>
+              <Text style={styles.placesCalloutBadgeText}>PAID</Text>
+            </View>
+          </View>
+          <Text style={styles.calloutTitle} numberOfLines={1}>{place.name}</Text>
+          <Text style={styles.calloutAddress} numberOfLines={1}>{place.vicinity}</Text>
+          <View style={styles.calloutFooter}>
+            {place.rating != null && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <Ionicons name="star" size={12} color={COLORS.accent} />
+                <Text style={styles.calloutPrice}>{place.rating.toFixed(1)}</Text>
+              </View>
+            )}
+            {place.openNow != null && (
+              <View style={place.openNow ? styles.availableBadge : styles.unavailableBadge}>
+                <Text style={place.openNow ? styles.availableText : styles.unavailableText}>
+                  {place.openNow ? 'Open' : 'Closed'}
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.calloutHint}>Commercial parking lot</Text>
         </View>
       </Callout>
     </Marker>
@@ -159,6 +218,64 @@ const styles = StyleSheet.create({
   },
   priceTextSelected: {
     color: COLORS.white,
+  },
+
+  // Places marker styles
+  placesContainer: {
+    alignItems: 'center',
+  },
+  placesMarker: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.places,
+    ...SHADOWS.md,
+  },
+  placesMarkerSelected: {
+    backgroundColor: COLORS.places,
+    borderColor: COLORS.placesDark,
+  },
+  placesPText: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.bold,
+    color: COLORS.places,
+  },
+  placesPTextSelected: {
+    color: COLORS.white,
+  },
+  placesTail: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: COLORS.places,
+    marginTop: -2,
+  },
+  placesTailSelected: {
+    borderTopColor: COLORS.placesDark,
+  },
+  placesCalloutHeader: {
+    flexDirection: 'row',
+    marginBottom: SPACING.xs,
+  },
+  placesCalloutBadge: {
+    backgroundColor: COLORS.placesLight,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  placesCalloutBadgeText: {
+    fontSize: FONTS.sizes.xs,
+    fontWeight: FONTS.weights.bold,
+    color: COLORS.places,
+    letterSpacing: 0.5,
   },
 
   // Callout styles

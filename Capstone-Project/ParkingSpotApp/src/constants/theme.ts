@@ -14,14 +14,19 @@ export const COLORS = {
   secondaryDark: '#27AE60',
 
   // Accent colors
-  accent: '#F39C12',
-  accentDark: '#E67E22',
+  accent: '#F97316',
+  accentDark: '#EA580C',
+
+  // Places (paid commercial parking) color
+  places: '#7C3AED',
+  placesDark: '#6D28D9',
+  placesLight: '#C4B5FD',
 
   // Status colors
-  success: '#2ECC71',
-  warning: '#F1C40F',
-  error: '#E74C3C',
-  info: '#3498DB',
+  success: '#22C55E',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  info: '#3B82F6',
 
   // Neutral colors
   white: '#FFFFFF',
@@ -40,11 +45,11 @@ export const COLORS = {
   },
 
   // Background colors
-  background: '#F5F7FA',
+  background: '#F5F7FF',
   surface: '#FFFFFF',
 
   // Text colors
-  textPrimary: '#1F2937',
+  textPrimary: '#1A1F36',
   textSecondary: '#6B7280',
   textMuted: '#9CA3AF',
   textOnPrimary: '#FFFFFF',

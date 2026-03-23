@@ -2,4 +2,4 @@
  * Maps Components Export
  */
 
-export { ParkingMarker, UserLocationMarker } from './ParkingMarker';
+export { ParkingMarker, PlacesMarker, UserLocationMarker } from './ParkingMarker';
