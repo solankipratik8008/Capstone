@@ -1,6 +1,5 @@
 /**
  * Profile Stack Navigator
- * Stack navigation for profile-related screens
  */
 
 import React from 'react';
@@ -13,6 +12,10 @@ import MyBookingsScreen from '../screens/Profile/MyBookingsScreen';
 import OwnerBookingsScreen from '../screens/Profile/OwnerBookingsScreen';
 import AddSpotScreen from '../screens/ParkingSpot/AddSpotScreen';
 import SpotDetailsScreen from '../screens/ParkingSpot/SpotDetailsScreen';
+import HelpCenterScreen from '../screens/Settings/HelpCenterScreen';
+import TermsOfServiceScreen from '../screens/Settings/TermsOfServiceScreen';
+import PrivacyPolicyScreen from '../screens/Settings/PrivacyPolicyScreen';
+import PaymentMethodsScreen from '../screens/Settings/PaymentMethodsScreen';
 import { COLORS } from '../constants';
 
 export type ProfileStackParamList = {
@@ -23,6 +26,10 @@ export type ProfileStackParamList = {
   OwnerBookings: undefined;
   AddSpot: { spotId?: string } | undefined;
   SpotDetails: { spotId: string };
+  HelpCenter: undefined;
+  TermsOfService: undefined;
+  PrivacyPolicy: undefined;
+  PaymentMethods: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -43,6 +50,10 @@ export const ProfileStackNavigator: React.FC = () => {
       <Stack.Screen name="OwnerBookings" component={OwnerBookingsScreen} />
       <Stack.Screen name="AddSpot" component={AddSpotScreen} />
       <Stack.Screen name="SpotDetails" component={SpotDetailsScreen} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+      <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+      <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
     </Stack.Navigator>
   );
 };

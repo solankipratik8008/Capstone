@@ -1,6 +1,5 @@
 /**
- * Profile Screen
- * Displays user information and settings
+ * Profile Screen — premium redesign
  */
 
 import React from 'react';
@@ -17,58 +16,46 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Avatar, Badge, Card } from '../../components/common';
+import { Avatar } from '../../components/common';
 import { useAuth, useParkingSpots } from '../../context';
-import {
-  COLORS,
-  SPACING,
-  FONTS,
-  BORDER_RADIUS,
-  SHADOWS,
-} from '../../constants';
+import { COLORS, SPACING, FONTS, BORDER_RADIUS, SHADOWS } from '../../constants';
 import { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 
 type NavigationProp = NativeStackNavigationProp<ProfileStackParamList>;
 
 interface MenuItemProps {
   icon: keyof typeof Ionicons.glyphMap;
+  iconColor?: string;
+  iconBg?: string;
   title: string;
   subtitle?: string;
   onPress: () => void;
-  showBadge?: boolean;
   badgeCount?: number;
   danger?: boolean;
+  last?: boolean;
 }
 
 const MenuItem: React.FC<MenuItemProps> = ({
-  icon,
-  title,
-  subtitle,
-  onPress,
-  showBadge,
-  badgeCount,
-  danger,
+  icon, iconColor, iconBg, title, subtitle, onPress, badgeCount, danger, last,
 }) => (
-  <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-    <View style={[styles.menuIcon, danger && styles.menuIconDanger]}>
-      <Ionicons
-        name={icon}
-        size={22}
-        color={danger ? COLORS.error : COLORS.primary}
-      />
+  <TouchableOpacity
+    style={[styles.menuItem, last && styles.menuItemLast]}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    <View style={[styles.menuIcon, { backgroundColor: danger ? COLORS.error + '15' : (iconBg ?? COLORS.primary + '15') }]}>
+      <Ionicons name={icon} size={20} color={danger ? COLORS.error : (iconColor ?? COLORS.primary)} />
     </View>
     <View style={styles.menuContent}>
-      <Text style={[styles.menuTitle, danger && styles.menuTitleDanger]}>
-        {title}
-      </Text>
+      <Text style={[styles.menuTitle, danger && styles.menuTitleDanger]}>{title}</Text>
       {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
     </View>
-    {showBadge && badgeCount !== undefined && badgeCount > 0 && (
+    {badgeCount !== undefined && badgeCount > 0 && (
       <View style={styles.badge}>
         <Text style={styles.badgeText}>{badgeCount}</Text>
       </View>
     )}
-    <Ionicons name="chevron-forward" size={20} color={COLORS.gray[400]} />
+    {!danger && <Ionicons name="chevron-forward" size={18} color={COLORS.gray[400]} />}
   </TouchableOpacity>
 );
 
@@ -78,37 +65,33 @@ export const ProfileScreen: React.FC = () => {
   const { userSpots } = useParkingSpots();
 
   const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-            } catch (error) {
-              console.error('Sign out error:', error);
-            }
-          },
-        },
-      ]
-    );
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out', style: 'destructive',
+        onPress: async () => { try { await signOut(); } catch {} },
+      },
+    ]);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
+
+        {/* Header banner */}
+        <View style={styles.headerBanner}>
+          <Text style={styles.headerTitle}>My Profile</Text>
+          <TouchableOpacity
+            style={styles.settingsBtn}
+            onPress={() => navigation.navigate('EditProfile')}
+          >
+            <Ionicons name="settings-outline" size={22} color={COLORS.white} />
+          </TouchableOpacity>
         </View>
 
-        {/* User Info Card */}
-        <Card style={styles.userCard}>
-          <View style={styles.userInfo}>
+        {/* User card */}
+        <View style={styles.userCardWrapper}>
+          <View style={styles.userCard}>
             <Avatar
               source={user?.photoURL}
               name={user?.name}
@@ -118,72 +101,77 @@ export const ProfileScreen: React.FC = () => {
             />
             <Text style={styles.userName}>{user?.name || 'User'}</Text>
             <Text style={styles.userEmail}>{user?.email}</Text>
-            <Badge
-              text="Member"
-              variant="default"
-            />
+
+            <View style={styles.memberBadge}>
+              <Ionicons name="star" size={12} color={COLORS.accent} />
+              <Text style={styles.memberBadgeText}>ParkSpot Member</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.editProfileBtn}
+              onPress={() => navigation.navigate('EditProfile')}
+            >
+              <Ionicons name="create-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.editProfileBtnText}>Edit Profile</Text>
+            </TouchableOpacity>
           </View>
+        </View>
 
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => navigation.navigate('EditProfile')}
-          >
-            <Ionicons name="create-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
-        </Card>
-
-        {/* Stats Card */}
-        <Card style={styles.statsCard}>
-          <View style={styles.statItem}>
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
             <Text style={styles.statValue}>{userSpots.length}</Text>
-            <Text style={styles.statLabel}>Listed Spots</Text>
+            <Text style={styles.statLabel}>Listed</Text>
           </View>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>
-              {userSpots.filter((s) => s.isAvailable).length}
-            </Text>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{userSpots.filter((s) => s.isAvailable).length}</Text>
             <Text style={styles.statLabel}>Available</Text>
           </View>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Bookings</Text>
+          <View style={styles.statBox}>
+            <Text style={[styles.statValue, { color: COLORS.success }]}>★ –</Text>
+            <Text style={styles.statLabel}>Rating</Text>
           </View>
-        </Card>
+        </View>
 
-        {/* Menu Section - Parking */}
-        <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>My Parking</Text>
-          <Card padding="none">
+        {/* My Parking */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>MY PARKING</Text>
+          <View style={styles.menuCard}>
             <MenuItem
               icon="car-outline"
+              iconColor="#3B82F6"
+              iconBg="#3B82F615"
               title="My Parking Spots"
-              subtitle={`${userSpots.length} spots listed`}
+              subtitle={`${userSpots.length} spot${userSpots.length !== 1 ? 's' : ''} listed`}
               onPress={() => navigation.navigate('MySpots')}
-              showBadge
               badgeCount={userSpots.length}
             />
             <MenuItem
               icon="people-outline"
+              iconColor="#8B5CF6"
+              iconBg="#8B5CF615"
               title="Spot Bookings"
               subtitle="See who booked your spots"
               onPress={() => navigation.navigate('OwnerBookings')}
             />
             <MenuItem
               icon="add-circle-outline"
+              iconColor="#10B981"
+              iconBg="#10B98115"
               title="Add New Spot"
               subtitle="List a new parking space"
               onPress={() => navigation.navigate('AddSpot')}
+              last
             />
-          </Card>
+          </View>
         </View>
 
-        {/* Menu Section - Account */}
-        <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>Account</Text>
-          <Card padding="none">
+        {/* Account */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>ACCOUNT</Text>
+          <View style={styles.menuCard}>
             <MenuItem
               icon="person-outline"
               title="Personal Information"
@@ -191,200 +179,143 @@ export const ProfileScreen: React.FC = () => {
             />
             <MenuItem
               icon="calendar-outline"
+              iconColor="#F97316"
+              iconBg="#F9731615"
               title="My Bookings"
               subtitle="View your parking reservations"
               onPress={() => navigation.navigate('MyBookings')}
             />
             <MenuItem
-              icon="notifications-outline"
-              title="Notifications"
-              onPress={() => Alert.alert('Notifications', 'You will receive notifications for:\n• Booking confirmations\n• Payment receipts\n• Spot availability updates')}
-            />
-            <MenuItem
               icon="card-outline"
+              iconColor="#635BFF"
+              iconBg="#635BFF15"
               title="Payment Methods"
-              onPress={() => Alert.alert('Payment Methods', 'Payments are securely processed by Stripe.\nYour card details are never stored on our servers.\n\nAdd a card when making a booking.')}
+              subtitle="Powered by Stripe"
+              onPress={() => navigation.navigate('PaymentMethods')}
+              last
             />
-          </Card>
+          </View>
         </View>
 
-        {/* Menu Section - Support */}
-        <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>Support</Text>
-          <Card padding="none">
+        {/* Support */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>SUPPORT</Text>
+          <View style={styles.menuCard}>
             <MenuItem
               icon="help-circle-outline"
+              iconColor="#06B6D4"
+              iconBg="#06B6D415"
               title="Help Center"
-              onPress={() => Alert.alert('Help Center', 'Need help? Contact us at:\nsupport@parkspot.app\n\nCommon questions:\n• How do I list my spot?\n• How do I cancel a booking?\n• How long does payment take?')}
+              subtitle="FAQs and contact support"
+              onPress={() => navigation.navigate('HelpCenter')}
             />
             <MenuItem
               icon="document-text-outline"
               title="Terms of Service"
-              onPress={() => Alert.alert('Terms of Service', 'By using ParkSpot, you agree to our terms. Bookings are binding once payment is processed. Cancellations must be made 2 hours before booking start for a full refund.')}
+              onPress={() => navigation.navigate('TermsOfService')}
             />
             <MenuItem
               icon="shield-checkmark-outline"
+              iconColor="#10B981"
+              iconBg="#10B98115"
               title="Privacy Policy"
-              onPress={() => Alert.alert('Privacy Policy', 'ParkSpot collects location data to show nearby spots. We use Firebase for secure authentication. We never sell your personal data to third parties.')}
+              onPress={() => navigation.navigate('PrivacyPolicy')}
+              last
             />
-          </Card>
+          </View>
         </View>
 
         {/* Sign Out */}
-        <View style={styles.menuSection}>
-          <Card padding="none">
+        <View style={[styles.section, { marginBottom: SPACING.xl }]}>
+          <View style={styles.menuCard}>
             <MenuItem
               icon="log-out-outline"
               title="Sign Out"
               onPress={handleSignOut}
               danger
+              last
             />
-          </Card>
+          </View>
         </View>
 
-        {/* App Version */}
-        <Text style={styles.version}>Version 1.0.0</Text>
+        <Text style={styles.version}>ParkSpot v1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  headerTitle: {
-    fontSize: FONTS.sizes.xxl,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.textPrimary,
-  },
-  userCard: {
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
-  },
-  userInfo: {
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-  },
-  userName: {
-    fontSize: FONTS.sizes.xl,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.textPrimary,
-    marginTop: SPACING.md,
-  },
-  userEmail: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textMuted,
-    marginBottom: SPACING.sm,
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.xs,
-    paddingVertical: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray[200],
-  },
-  editButtonText: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.primary,
-    fontWeight: FONTS.weights.medium,
-  },
-  statsCard: {
-    flexDirection: 'row',
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: FONTS.sizes.xxl,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.primary,
-  },
-  statLabel: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textMuted,
-    marginTop: SPACING.xs,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: COLORS.gray[200],
-    marginVertical: SPACING.sm,
-  },
-  menuSection: {
-    marginBottom: SPACING.lg,
-    paddingHorizontal: SPACING.lg,
-  },
-  menuSectionTitle: {
-    fontSize: FONTS.sizes.sm,
-    fontWeight: FONTS.weights.semibold,
-    color: COLORS.textMuted,
-    textTransform: 'uppercase',
-    marginBottom: SPACING.sm,
-    marginLeft: SPACING.sm,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[100],
-  },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primary + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  menuIconDanger: {
-    backgroundColor: COLORS.error + '15',
-  },
-  menuContent: {
-    flex: 1,
-  },
-  menuTitle: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.medium,
-    color: COLORS.textPrimary,
-  },
-  menuTitleDanger: {
-    color: COLORS.error,
-  },
-  menuSubtitle: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  badge: {
+  container: { flex: 1, backgroundColor: COLORS.background },
+
+  headerBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.full,
-    marginRight: SPACING.sm,
+    paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.xxxl,
   },
-  badgeText: {
-    fontSize: FONTS.sizes.xs,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.white,
+  headerTitle: { fontSize: FONTS.sizes.xxl, fontWeight: FONTS.weights.bold, color: COLORS.white },
+  settingsBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center',
   },
-  version: {
-    textAlign: 'center',
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textMuted,
-    marginVertical: SPACING.xl,
+
+  userCardWrapper: { paddingHorizontal: SPACING.lg, marginTop: -SPACING.xxl, marginBottom: SPACING.md },
+  userCard: {
+    backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg, alignItems: 'center', ...SHADOWS.lg,
   },
+  userName: { fontSize: FONTS.sizes.xl, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary, marginTop: SPACING.md },
+  userEmail: { fontSize: FONTS.sizes.sm, color: COLORS.textMuted, marginTop: 2, marginBottom: SPACING.sm },
+  memberBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: COLORS.accent + '15', borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING.md, paddingVertical: 5, marginBottom: SPACING.md,
+  },
+  memberBadgeText: { fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.semibold, color: COLORS.accent },
+  editProfileBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1.5, borderColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.lg, paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg,
+  },
+  editProfileBtnText: { fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.semibold, color: COLORS.primary },
+
+  statsRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: COLORS.white, marginHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl, padding: SPACING.lg,
+    marginBottom: SPACING.lg, ...SHADOWS.sm,
+  },
+  statBox: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: FONTS.sizes.xxl, fontWeight: FONTS.weights.bold, color: COLORS.primary },
+  statLabel: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted, marginTop: 2 },
+  statDivider: { width: 1, height: 40, backgroundColor: COLORS.gray[200] },
+
+  section: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.md },
+  sectionLabel: {
+    fontSize: FONTS.sizes.xs, fontWeight: FONTS.weights.bold, color: COLORS.textMuted,
+    letterSpacing: 1, marginBottom: SPACING.sm, marginLeft: SPACING.xs,
+  },
+  menuCard: { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.xl, overflow: 'hidden', ...SHADOWS.sm },
+  menuItem: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: SPACING.md, paddingHorizontal: SPACING.md,
+    borderBottomWidth: 1, borderBottomColor: COLORS.gray[100],
+  },
+  menuItemLast: { borderBottomWidth: 0 },
+  menuIcon: {
+    width: 38, height: 38, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md,
+  },
+  menuContent: { flex: 1 },
+  menuTitle: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.medium, color: COLORS.textPrimary },
+  menuTitleDanger: { color: COLORS.error },
+  menuSubtitle: { fontSize: FONTS.sizes.sm, color: COLORS.textMuted, marginTop: 1 },
+  badge: {
+    backgroundColor: COLORS.primary, paddingHorizontal: SPACING.sm, paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full, marginRight: SPACING.sm,
+    minWidth: 22, alignItems: 'center',
+  },
+  badgeText: { fontSize: FONTS.sizes.xs, fontWeight: FONTS.weights.bold, color: COLORS.white },
+  version: { textAlign: 'center', fontSize: FONTS.sizes.sm, color: COLORS.textMuted, marginBottom: SPACING.xl },
 });
 
 export default ProfileScreen;

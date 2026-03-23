@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 import { useAuth } from '../../context';
 import { getUserBookings, cancelBooking } from '../../services/firebase/bookings';
 import { Booking, BookingStatus } from '../../constants';
@@ -29,6 +31,7 @@ const MyBookingsScreen: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [qrBooking, setQrBooking] = useState<Booking | null>(null);
 
   const loadBookings = () => {
     if (!user) return;
@@ -136,12 +139,52 @@ const MyBookingsScreen: React.FC = () => {
             Cancellation unavailable (less than 5 hours until check-in)
           </Text>
         )}
+
+        {/* QR Code button for confirmed/upcoming bookings */}
+        {item.status === BookingStatus.CONFIRMED && (
+          <TouchableOpacity
+            style={styles.qrButton}
+            onPress={() => setQrBooking(item)}
+          >
+            <Ionicons name="qr-code-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.qrButtonText}>Show Entry QR Code</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* QR Modal */}
+      <Modal visible={!!qrBooking} transparent animationType="fade" onRequestClose={() => setQrBooking(null)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setQrBooking(null)}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{qrBooking?.spotTitle}</Text>
+            <Text style={styles.modalSubtitle}>
+              {qrBooking ? `${formatDate(qrBooking.startTime)} → ${formatDate(qrBooking.endTime)}` : ''}
+            </Text>
+            <View style={styles.modalQrBox}>
+              {qrBooking && (
+                <QRCode
+                  value={`PARKSPOT:${qrBooking.id}:${qrBooking.spotId}:${qrBooking.startTime.toISOString()}:${qrBooking.endTime.toISOString()}`}
+                  size={200}
+                  color={COLORS.textPrimary}
+                  backgroundColor={COLORS.white}
+                />
+              )}
+            </View>
+            <Text style={styles.modalBookingId}>
+              Booking #{qrBooking?.id.slice(0, 8).toUpperCase()}
+            </Text>
+            <Text style={styles.modalHint}>Present this QR code at the parking gate</Text>
+            <TouchableOpacity style={styles.modalClose} onPress={() => setQrBooking(null)}>
+              <Text style={styles.modalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -234,6 +277,35 @@ const styles = StyleSheet.create({
   cancelButtonDisabled: { opacity: 0.5 },
   cancelButtonText: { fontSize: FONTS.sizes.sm, color: COLORS.error, fontWeight: FONTS.weights.semibold },
   noCancelNote: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted, textAlign: 'center', marginTop: SPACING.sm },
+  qrButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs,
+    marginTop: SPACING.sm, paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md, backgroundColor: COLORS.primary + '12',
+    borderWidth: 1, borderColor: COLORS.primary + '30',
+  },
+  qrButtonText: { fontSize: FONTS.sizes.sm, color: COLORS.primary, fontWeight: FONTS.weights.semibold },
+  // QR Modal
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center', justifyContent: 'center', padding: SPACING.xl,
+  },
+  modalCard: {
+    backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.xl, alignItems: 'center', width: '100%', ...SHADOWS.lg,
+  },
+  modalTitle: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary, textAlign: 'center', marginBottom: 4 },
+  modalSubtitle: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, marginBottom: SPACING.lg, textAlign: 'center' },
+  modalQrBox: {
+    padding: SPACING.lg, borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 2, borderColor: COLORS.primary + '30', marginBottom: SPACING.md,
+  },
+  modalBookingId: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semibold, color: COLORS.textPrimary, marginBottom: 4 },
+  modalHint: { fontSize: FONTS.sizes.sm, color: COLORS.textMuted, textAlign: 'center', marginBottom: SPACING.lg },
+  modalClose: {
+    backgroundColor: COLORS.primary, borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: SPACING.sm, paddingHorizontal: SPACING.xxl,
+  },
+  modalCloseText: { color: COLORS.white, fontWeight: FONTS.weights.semibold, fontSize: FONTS.sizes.md },
 });
 
 export default MyBookingsScreen;

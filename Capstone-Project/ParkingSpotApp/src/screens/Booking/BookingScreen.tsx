@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import QRCode from 'react-native-qrcode-svg';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStripe } from '@stripe/stripe-react-native';
@@ -207,6 +208,20 @@ const BookingScreen: React.FC = () => {
             </View>
           </View>
 
+          {/* QR Code */}
+          <View style={styles.qrContainer}>
+            <Text style={styles.qrLabel}>Your Entry QR Code</Text>
+            <View style={styles.qrBox}>
+              <QRCode
+                value={`PARKSPOT:${confirmedBooking.bookingId}:${spotId}:${confirmedBooking.start.toISOString()}:${confirmedBooking.end.toISOString()}`}
+                size={160}
+                color={COLORS.textPrimary}
+                backgroundColor={COLORS.white}
+              />
+            </View>
+            <Text style={styles.qrHint}>Show this at entry / exit gates</Text>
+          </View>
+
           <Text style={styles.confirmNote}>
             Booking ID: {confirmedBooking.bookingId.slice(0, 8).toUpperCase()}
           </Text>
@@ -357,7 +372,15 @@ const styles = StyleSheet.create({
   },
   confirmLabel: { fontSize: FONTS.sizes.md, color: COLORS.textSecondary },
   confirmValue: { fontSize: FONTS.sizes.md, color: COLORS.textPrimary, fontWeight: FONTS.weights.medium },
-  confirmNote: { fontSize: FONTS.sizes.sm, color: COLORS.textMuted, marginBottom: SPACING.xl },
+  qrContainer: { alignItems: 'center', marginVertical: SPACING.lg, width: '100%' },
+  qrLabel: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semibold, color: COLORS.textPrimary, marginBottom: SPACING.md },
+  qrBox: {
+    padding: SPACING.lg, backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl, ...SHADOWS.md,
+    borderWidth: 2, borderColor: COLORS.primary + '30',
+  },
+  qrHint: { fontSize: FONTS.sizes.sm, color: COLORS.textMuted, marginTop: SPACING.sm },
+  confirmNote: { fontSize: FONTS.sizes.sm, color: COLORS.textMuted, marginBottom: SPACING.lg },
   confirmButton: {
     backgroundColor: COLORS.primary,
     borderRadius: BORDER_RADIUS.lg,
