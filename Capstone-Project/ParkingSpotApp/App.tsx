@@ -15,6 +15,7 @@ import { StyleSheet } from 'react-native';
 
 import { AuthProvider, ParkingSpotsProvider, LocationProvider } from './src/context';
 import { RootNavigator } from './src/navigation';
+import { ThemeProvider, useAppTheme } from './src/theme';
 
 // Stripe publishable key — safe to expose in client code.
 // Replace with your actual Stripe publishable key from https://dashboard.stripe.com/apikeys
@@ -34,20 +35,32 @@ export default function App() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
-        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.parkspot.app">
-          <AuthProvider>
-            <LocationProvider>
-              <ParkingSpotsProvider>
-                <StatusBar style="auto" />
-                <RootNavigator />
-              </ParkingSpotsProvider>
-            </LocationProvider>
-          </AuthProvider>
-        </StripeProvider>
+        <ThemeProvider>
+          <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.parkspot.app">
+            <AuthProvider>
+              <LocationProvider>
+                <ParkingSpotsProvider>
+                  <AppShell />
+                </ParkingSpotsProvider>
+              </LocationProvider>
+            </AuthProvider>
+          </StripeProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
+
+const AppShell: React.FC = () => {
+  const { isDark } = useAppTheme();
+
+  return (
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <RootNavigator />
+    </>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {

@@ -1,103 +1,100 @@
-/**
- * Sign Up Screen
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
+  Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
   TouchableOpacity,
-  Alert,
+  View,
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-// GoogleSignin is loaded lazily via require() inside handlers to avoid crashing Expo Go
-import * as AppleAuthentication from 'expo-apple-authentication';
-import * as Crypto from 'expo-crypto';
-import Constants from 'expo-constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Button, Input } from '../../components/common';
+import { Button, Card, Input } from '../../components/common';
+import { RootStackParamList, UserRole, VALIDATION } from '../../constants';
 import { useAuth } from '../../context';
-import { COLORS, SPACING, FONTS, UserRole, RootStackParamList, VALIDATION } from '../../constants';
-import { GOOGLE_CONFIG } from '../../config/google';
-
-WebBrowser.maybeCompleteAuthSession();
+import { useGoogleAuth } from '../../hooks/useGoogleAuth';
+import { useAppTheme } from '../../theme';
+import { isAppleAuthCanceled, requestAppleSignIn } from '../../utils';
 
 const SignUpSchema = Yup.object().shape({
-  name: Yup.string().min(2, 'Name must be at least 2 characters').required('Name is required'),
-  email: Yup.string().email('Please enter a valid email').required('Email is required'),
+  name: Yup.string().min(2, 'Name must be at least 2 characters').required('Full name is required'),
+  email: Yup.string().email('Enter a valid email').required('Email is required'),
+  phone: Yup.string()
+    .matches(/^\+?[1-9]\d{6,14}$/, 'Enter a valid phone number with country code, e.g. +1 555 000 0000')
+    .optional(),
   password: Yup.string()
     .min(VALIDATION.MIN_PASSWORD_LENGTH, `Password must be at least ${VALIDATION.MIN_PASSWORD_LENGTH} characters`)
-    .matches(/[a-zA-Z]/, 'Password must contain at least one letter')
-    .matches(/[0-9]/, 'Password must contain at least one number')
+    .matches(/[a-zA-Z]/, 'Password must include a letter')
+    .matches(/[0-9]/, 'Password must include a number')
     .required('Password is required'),
   confirmPassword: Yup.string()
     .oneOf([Yup.ref('password')], 'Passwords must match')
-    .required('Please confirm your password'),
+    .required('Confirm your password'),
 });
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-interface FormValues {
-  name: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-}
+const ROLE_OPTIONS = [
+  {
+    value: UserRole.USER,
+    title: 'Find Parking',
+    subtitle: 'Book spots quickly near work, school, or events.',
+    icon: 'search-outline' as const,
+  },
+  {
+    value: UserRole.HOMEOWNER,
+    title: 'List Parking',
+    subtitle: 'Earn money by renting your driveway, garage, or lot.',
+    icon: 'home-outline' as const,
+  },
+];
 
 export const SignUpScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { signUp, signInWithGoogle, signInWithApple } = useAuth();
+  const { signUp, signInWithApple } = useAuth();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.USER);
+  const { requestReady, isLoading: googleLoading, signIn: handleGoogleSignIn } = useGoogleAuth({
+    role: selectedRole,
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
-
-  const isExpoGo = Constants.appOwnership === 'expo';
+  const [appleLoading, setAppleLoading] = useState(false);
 
   useEffect(() => {
-    if (isExpoGo) return;
-    try {
-      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
-      GoogleSignin.configure({ webClientId: GOOGLE_CONFIG.webClientId });
-    } catch {}
     AppleAuthentication.isAvailableAsync()
       .then(setAppleAvailable)
       .catch(() => setAppleAvailable(false));
   }, []);
 
-  const handleGoogleSignIn = async () => {
-    if (isExpoGo) {
-      Alert.alert(
-        'Google Sign-In Unavailable',
-        'Google Sign-In is not supported in Expo Go. Please use email/password, or use the production app build.'
-      );
-      return;
-    }
+  const submit = async (values: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    confirmPassword: string;
+  }) => {
     setIsLoading(true);
-    let GoogleSignin: any, statusCodes: any;
     try {
-      ({ GoogleSignin, statusCodes } = require('@react-native-google-signin/google-signin'));
-    } catch {
-      setIsLoading(false);
-      return;
-    }
-    try {
-      await GoogleSignin.hasPlayServices();
-      const userInfo = await GoogleSignin.signIn();
-      const idToken = userInfo.data?.idToken;
-      if (!idToken) throw new Error('No ID token returned from Google.');
-      await signInWithGoogle(idToken);
+      await signUp(
+        values.email.trim(),
+        values.password,
+        values.name.trim(),
+        selectedRole,
+        values.phone.trim() || undefined,
+      );
     } catch (error: any) {
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) return;
-      if (error.code === statusCodes.IN_PROGRESS) return;
       Alert.alert('Sign-Up Failed', error.message || 'Please try again.');
     } finally {
       setIsLoading(false);
@@ -105,51 +102,32 @@ export const SignUpScreen: React.FC = () => {
   };
 
   const handleAppleSignIn = async () => {
-    try {
-      const rawNonce = Math.random().toString(36).substring(2, 18);
-      const hashedNonce = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        rawNonce
+    const isExpoGo = Constants.appOwnership === 'expo';
+    if (isExpoGo) {
+      Alert.alert(
+        'Development Build Required',
+        'Apple Sign-In is not available in Expo Go. Please use an EAS development build on a real iPhone to sign in with Apple.',
       );
-
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-        nonce: hashedNonce,
-      });
-
-      if (!credential.identityToken) {
-        Alert.alert('Apple Sign-In Error', 'No identity token returned.');
-        return;
-      }
-
-      setIsLoading(true);
-      await signInWithApple(credential.identityToken, rawNonce);
-    } catch (error: any) {
-      if (error.code === 'ERR_REQUEST_CANCELED') return;
-      Alert.alert('Apple Sign-Up Failed', error.message || 'Please try again.');
-    } finally {
-      setIsLoading(false);
+      return;
     }
-  };
 
-  const handleSignUp = async (values: FormValues) => {
-    setIsLoading(true);
+    setAppleLoading(true);
     try {
-      await signUp(values.email, values.password, values.name, UserRole.USER);
+      const payload = await requestAppleSignIn(selectedRole);
+      await signInWithApple(payload);
     } catch (error: any) {
-      Alert.alert('Sign-Up Failed', error.message);
+      if (!isAppleAuthCanceled(error)) {
+        Alert.alert('Apple Sign-Up Failed', error.message || 'Please try again.');
+      }
     } finally {
-      setIsLoading(false);
+      setAppleLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
         <ScrollView
@@ -157,135 +135,170 @@ export const SignUpScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Back button */}
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-back" size={20} color={theme.colors.textPrimary} />
           </TouchableOpacity>
 
-          {/* Header */}
-          <View style={styles.header}>
+          <View style={styles.hero}>
             <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>
-              Join ParkSpot to find and share parking spaces
-            </Text>
+            <Text style={styles.subtitle}>Join ParkSpot to book or rent parking with confidence.</Text>
           </View>
 
-          {/* Form */}
-          <Formik
-            initialValues={{ name: '', email: '', password: '', confirmPassword: '' }}
-            validationSchema={SignUpSchema}
-            onSubmit={handleSignUp}
-            validateOnBlur={false}
-            validateOnChange={false}
-          >
-            {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
-              <View style={styles.form}>
-                <Input
-                  label="Full Name"
-                  placeholder="Enter your full name"
-                  autoCapitalize="words"
-                  autoComplete="name"
-                  leftIcon="person-outline"
-                  value={values.name}
-                  onChangeText={handleChange('name')}
-                  onBlur={handleBlur('name')}
-                  error={errors.name}
-                  touched={touched.name}
-                />
-
-                <Input
-                  label="Email"
-                  placeholder="Enter your email"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  leftIcon="mail-outline"
-                  value={values.email}
-                  onChangeText={handleChange('email')}
-                  onBlur={handleBlur('email')}
-                  error={errors.email}
-                  touched={touched.email}
-                />
-
-                <Input
-                  label="Password"
-                  placeholder="Create a password"
-                  leftIcon="lock-closed-outline"
-                  isPassword
-                  value={values.password}
-                  onChangeText={handleChange('password')}
-                  onBlur={handleBlur('password')}
-                  error={errors.password}
-                  touched={touched.password}
-                />
-
-                <Input
-                  label="Confirm Password"
-                  placeholder="Confirm your password"
-                  leftIcon="lock-closed-outline"
-                  isPassword
-                  value={values.confirmPassword}
-                  onChangeText={handleChange('confirmPassword')}
-                  onBlur={handleBlur('confirmPassword')}
-                  error={errors.confirmPassword}
-                  touched={touched.confirmPassword}
-                />
-
-                <Button
-                  title="Create Account"
-                  onPress={() => handleSubmit()}
-                  loading={isLoading}
-                  fullWidth
-                  size="large"
-                  style={styles.primaryButton}
-                />
-
-                <View style={styles.dividerContainer}>
-                  <View style={styles.divider} />
-                  <Text style={styles.dividerText}>OR</Text>
-                  <View style={styles.divider} />
-                </View>
-
-                {/* Google Sign-Up */}
-                <Button
-                  title="Continue with Google"
-                  onPress={handleGoogleSignIn}
-                  variant="outline"
-                  fullWidth
-                  size="large"
-                  icon={<Ionicons name="logo-google" size={20} color={COLORS.error} />}
-                  disabled={isLoading}
-                  style={styles.socialButton}
-                />
-
-                {/* Apple Sign-Up — iOS only */}
-                {appleAvailable && (
+          <Card style={styles.formCard}>
+            <Text style={styles.sectionLabel}>I want to</Text>
+            <View style={styles.roleRow}>
+              {ROLE_OPTIONS.map((option) => {
+                const selected = selectedRole === option.value;
+                return (
                   <TouchableOpacity
-                    style={styles.appleButton}
-                    onPress={handleAppleSignIn}
-                    disabled={isLoading}
+                    key={option.value}
+                    style={[styles.roleCard, selected && styles.roleCardSelected]}
                     activeOpacity={0.85}
+                    onPress={() => setSelectedRole(option.value)}
                   >
-                    <Ionicons name="logo-apple" size={20} color={COLORS.white} />
-                    <Text style={styles.appleButtonText}>Continue with Apple</Text>
+                    <View style={[styles.roleIcon, selected && styles.roleIconSelected]}>
+                      <Ionicons
+                        name={option.icon}
+                        size={22}
+                        color={selected ? theme.colors.textOnPrimary : theme.colors.primary}
+                      />
+                    </View>
+                    <Text style={[styles.roleTitle, selected && styles.roleTitleSelected]}>{option.title}</Text>
+                    <Text style={[styles.roleSubtitle, selected && styles.roleSubtitleSelected]}>
+                      {option.subtitle}
+                    </Text>
                   </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </Formik>
+                );
+              })}
+            </View>
 
-          {/* Footer */}
+            <Formik
+              initialValues={{ name: '', email: '', phone: '', password: '', confirmPassword: '' }}
+              validationSchema={SignUpSchema}
+              validateOnBlur={false}
+              validateOnChange={false}
+              onSubmit={submit}
+            >
+              {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
+                <View>
+                  <Input
+                    label="Full Name"
+                    placeholder="Enter your full name"
+                    autoCapitalize="words"
+                    autoComplete="name"
+                    leftIcon="person-outline"
+                    value={values.name}
+                    onChangeText={handleChange('name')}
+                    onBlur={handleBlur('name')}
+                    error={errors.name}
+                    touched={touched.name}
+                  />
+
+                  <Input
+                    label="Email"
+                    placeholder="Enter your email"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    keyboardType="email-address"
+                    leftIcon="mail-outline"
+                    value={values.email}
+                    onChangeText={handleChange('email')}
+                    onBlur={handleBlur('email')}
+                    error={errors.email}
+                    touched={touched.email}
+                  />
+
+                  <Input
+                    label="Phone Number (optional)"
+                    placeholder="+1 555 000 0000"
+                    keyboardType="phone-pad"
+                    leftIcon="phone-portrait-outline"
+                    value={values.phone}
+                    onChangeText={handleChange('phone')}
+                    onBlur={handleBlur('phone')}
+                    error={errors.phone}
+                    touched={touched.phone}
+                  />
+
+                  <Input
+                    label="Password"
+                    placeholder="Create a password"
+                    isPassword
+                    leftIcon="lock-closed-outline"
+                    value={values.password}
+                    onChangeText={handleChange('password')}
+                    onBlur={handleBlur('password')}
+                    error={errors.password}
+                    touched={touched.password}
+                  />
+
+                  <Input
+                    label="Confirm Password"
+                    placeholder="Confirm your password"
+                    isPassword
+                    leftIcon="lock-closed-outline"
+                    value={values.confirmPassword}
+                    onChangeText={handleChange('confirmPassword')}
+                    onBlur={handleBlur('confirmPassword')}
+                    error={errors.confirmPassword}
+                    touched={touched.confirmPassword}
+                  />
+
+                  <Button
+                    title="Create Account"
+                    onPress={() => handleSubmit()}
+                    loading={isLoading}
+                    fullWidth
+                    size="large"
+                    style={styles.primaryButton}
+                  />
+                </View>
+              )}
+            </Formik>
+
+            <View style={styles.dividerRow}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerLabel}>OR</Text>
+              <View style={styles.divider} />
+            </View>
+
+            <Button
+              title={googleLoading ? 'Connecting...' : 'Continue with Google'}
+              onPress={handleGoogleSignIn}
+              disabled={!requestReady || isLoading || appleLoading}
+              loading={googleLoading}
+              variant="outline"
+              fullWidth
+              icon={<Ionicons name="logo-google" size={18} color={theme.colors.primary} />}
+            />
+
+            {appleAvailable ? (
+              <Button
+                title={appleLoading ? 'Connecting...' : 'Continue with Apple'}
+                onPress={handleAppleSignIn}
+                disabled={isLoading || googleLoading}
+                loading={appleLoading}
+                variant="secondary"
+                fullWidth
+                style={styles.secondaryButton}
+                icon={<Ionicons name="logo-apple" size={18} color={theme.colors.textPrimary} />}
+              />
+            ) : null}
+          </Card>
+
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('SignIn')}>
-              <Text style={styles.signInLink}>Sign In</Text>
+            <Text style={styles.footerText}>Already have an account?</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('SignIn')} activeOpacity={0.8}>
+              <Text style={styles.footerLink}> Sign in</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.terms}>
-            By creating an account, you agree to our{' '}
-            <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-            <Text style={styles.termsLink}>Privacy Policy</Text>
+          <Text style={styles.legal}>
+            By creating an account you agree to our terms and privacy policy.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -293,106 +306,147 @@ export const SignUpScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.xl,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  header: {
-    marginBottom: SPACING.xl,
-  },
-  title: {
-    fontSize: FONTS.sizes.xxl,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.xs,
-  },
-  subtitle: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textSecondary,
-  },
-  form: {
-    marginBottom: SPACING.lg,
-  },
-  primaryButton: {
-    marginTop: SPACING.md,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: SPACING.md,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.gray[300],
-  },
-  dividerText: {
-    paddingHorizontal: SPACING.md,
-    color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.sm,
-    fontWeight: FONTS.weights.medium,
-  },
-  socialButton: {
-    marginBottom: SPACING.sm,
-  },
-  appleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    backgroundColor: '#000',
-    borderRadius: 12,
-    paddingVertical: SPACING.md,
-    marginTop: SPACING.xs,
-  },
-  appleButtonText: {
-    color: COLORS.white,
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.semibold,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-  },
-  footerText: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textSecondary,
-  },
-  signInLink: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.primary,
-    fontWeight: FONTS.weights.semibold,
-  },
-  terms: {
-    fontSize: FONTS.sizes.xs,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  termsLink: {
-    color: COLORS.primary,
-  },
-});
+const createStyles = ({ colors, spacing, typography, radii }: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    keyboardView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.xxl,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      borderRadius: radii.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    hero: {
+      marginTop: spacing.xl,
+      marginBottom: spacing.lg,
+    },
+    title: {
+      color: colors.textPrimary,
+      fontSize: typography.sizes.xxxl,
+      fontWeight: typography.weights.heavy,
+      marginBottom: spacing.xs,
+    },
+    subtitle: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.md,
+      lineHeight: 22,
+    },
+    formCard: {
+      padding: spacing.lg,
+    },
+    sectionLabel: {
+      color: colors.textPrimary,
+      fontSize: typography.sizes.lg,
+      fontWeight: typography.weights.bold,
+      marginBottom: spacing.md,
+    },
+    roleRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    roleCard: {
+      flex: 1,
+      borderRadius: radii.xl,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      padding: spacing.md,
+      backgroundColor: colors.surface,
+      minHeight: 146,
+    },
+    roleCardSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryFaint,
+    },
+    roleIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: radii.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primaryFaint,
+      marginBottom: spacing.md,
+    },
+    roleIconSelected: {
+      backgroundColor: colors.primary,
+    },
+    roleTitle: {
+      color: colors.textPrimary,
+      fontSize: typography.sizes.lg,
+      fontWeight: typography.weights.bold,
+      marginBottom: spacing.xs,
+    },
+    roleTitleSelected: {
+      color: colors.primary,
+    },
+    roleSubtitle: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.sm,
+      lineHeight: 18,
+    },
+    roleSubtitleSelected: {
+      color: colors.textSecondary,
+    },
+    primaryButton: {
+      marginTop: spacing.sm,
+    },
+    secondaryButton: {
+      marginTop: spacing.md,
+    },
+    dividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginVertical: spacing.lg,
+    },
+    divider: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    dividerLabel: {
+      color: colors.textMuted,
+      fontSize: typography.sizes.xs,
+      fontWeight: typography.weights.bold,
+      letterSpacing: 1,
+    },
+    footer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: spacing.lg,
+    },
+    footerText: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.md,
+    },
+    footerLink: {
+      color: colors.primary,
+      fontSize: typography.sizes.md,
+      fontWeight: typography.weights.bold,
+    },
+    legal: {
+      color: colors.textMuted,
+      fontSize: typography.sizes.sm,
+      lineHeight: 20,
+      textAlign: 'center',
+      marginTop: spacing.md,
+    },
+  });
 
 export default SignUpScreen;

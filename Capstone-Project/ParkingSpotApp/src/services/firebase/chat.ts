@@ -16,10 +16,9 @@ import {
   serverTimestamp,
   onSnapshot,
   Unsubscribe,
-  setDoc,
 } from 'firebase/firestore';
 import { db } from './config';
-import { Chat, Message, COLLECTIONS } from '../../constants';
+import { Chat, Message } from '../../constants';
 
 // Re-export COLLECTIONS from the right place
 const CHATS = 'chats';
@@ -44,15 +43,26 @@ const convertDocToChat = (docId: string, data: any): Chat => ({
 /**
  * Converts Firestore doc to Message object
  */
-const convertDocToMessage = (docId: string, data: any): Message => ({
-  id: docId,
-  chatId: data.chatId || '',
-  senderId: data.senderId || '',
-  senderName: data.senderName || '',
-  text: data.text || '',
-  createdAt: data.createdAt?.toDate() || new Date(),
-  read: data.read ?? false,
-});
+const convertDocToMessage = (docId: string, data: any): Message => {
+  let createdAt: Date;
+  try {
+    createdAt = data.createdAt?.toDate?.() ?? new Date();
+    if (!(createdAt instanceof Date) || isNaN(createdAt.getTime())) {
+      createdAt = new Date();
+    }
+  } catch {
+    createdAt = new Date();
+  }
+  return {
+    id: docId,
+    chatId: data.chatId || '',
+    senderId: data.senderId || '',
+    senderName: data.senderName || '',
+    text: data.text || '',
+    createdAt,
+    read: data.read ?? false,
+  };
+};
 
 /**
  * Gets an existing chat between two users for a spot, or creates one.
@@ -182,7 +192,11 @@ export const subscribeToMessages = (
   return onSnapshot(
     q,
     (snapshot) => {
-      const messages = snapshot.docs.map((d) => convertDocToMessage(d.id, d.data()));
+      const messages = snapshot.docs
+        .map((d) => convertDocToMessage(d.id, d.data()))
+        // Filter out messages whose timestamp is still pending (null from serverTimestamp)
+        // to prevent render crashes before the server round-trip completes.
+        .filter((m) => m.createdAt instanceof Date && !isNaN(m.createdAt.getTime()));
       onUpdate(messages);
     },
     (error) => {

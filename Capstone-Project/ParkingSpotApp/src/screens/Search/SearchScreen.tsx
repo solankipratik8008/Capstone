@@ -1,42 +1,28 @@
-/**
- * Search Screen
- * Allows users to search and filter parking spots
- */
-
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
   FlatList,
-  TouchableOpacity,
-  TextInput,
   Modal,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
+import { Button, CardSkeleton, ChipGroup } from '../../components/common';
 import { ParkingSpotCard } from '../../components/parking';
-import { Button, ChipGroup, Loading, CardSkeleton } from '../../components/common';
-import { useParkingSpots, useLocation } from '../../context';
-import {
-  COLORS,
-  SPACING,
-  FONTS,
-  BORDER_RADIUS,
-  SHADOWS,
-  ParkingSpot,
-  SpotType,
-  SPOT_TYPE_LABELS,
-} from '../../constants';
+import { ParkingSpot, SPOT_TYPE_LABELS } from '../../constants';
+import { useLocation, useParkingSpots } from '../../context';
 import { MapStackParamList } from '../../navigation/MapStackNavigator';
+import { useAppTheme } from '../../theme';
 
 type NavigationProp = NativeStackNavigationProp<MapStackParamList>;
 
-// Price filter options
 const priceOptions = [
   { value: '10', label: '$10/hr' },
   { value: '20', label: '$20/hr' },
@@ -44,7 +30,6 @@ const priceOptions = [
   { value: '100', label: '$100/hr' },
 ];
 
-// Distance filter options
 const distanceOptions = [
   { value: '5', label: '5 km' },
   { value: '10', label: '10 km' },
@@ -52,21 +37,19 @@ const distanceOptions = [
   { value: '50', label: '50 km' },
 ];
 
-// Spot type filter options
 const spotTypeOptions = [
   { value: 'all', label: 'All Types' },
-  ...Object.entries(SPOT_TYPE_LABELS).map(([value, label]) => ({
-    value,
-    label,
-  })),
+  ...Object.entries(SPOT_TYPE_LABELS).map(([value, label]) => ({ value, label: String(label) })),
 ];
 
 export const SearchScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const { spots, isLoading } = useParkingSpots();
   const { userLocation, calculateDistance } = useLocation();
 
-  // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [maxPrice, setMaxPrice] = useState(50);
@@ -74,26 +57,21 @@ export const SearchScreen: React.FC = () => {
   const [selectedSpotTypes, setSelectedSpotTypes] = useState<string[]>(['all']);
   const [sortBy, setSortBy] = useState<'distance' | 'price' | 'rating'>('distance');
 
-  // Filter and sort spots
   const filteredSpots = useMemo(() => {
     let results = [...spots];
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      results = results.filter(
-        (spot) =>
-          spot.title.toLowerCase().includes(query) ||
-          spot.description.toLowerCase().includes(query) ||
-          spot.location.address?.toLowerCase().includes(query) ||
-          spot.location.city?.toLowerCase().includes(query)
+      results = results.filter((spot) =>
+        spot.title.toLowerCase().includes(query) ||
+        spot.description.toLowerCase().includes(query) ||
+        spot.location.address?.toLowerCase().includes(query) ||
+        spot.location.city?.toLowerCase().includes(query)
       );
     }
 
-    // Filter by price
     results = results.filter((spot) => spot.pricePerHour <= maxPrice);
 
-    // Filter by distance
     if (userLocation) {
       results = results.filter((spot) => {
         const distance = calculateDistance(spot.location);
@@ -101,39 +79,30 @@ export const SearchScreen: React.FC = () => {
       });
     }
 
-    // Filter by spot type
     if (!selectedSpotTypes.includes('all')) {
-      results = results.filter((spot) =>
-        selectedSpotTypes.includes(spot.spotType)
-      );
+      results = results.filter((spot) => selectedSpotTypes.includes(spot.spotType));
     }
 
-    // Sort results
     results.sort((a, b) => {
-      switch (sortBy) {
-        case 'price':
-          return a.pricePerHour - b.pricePerHour;
-        case 'rating':
-          return (b.rating || 0) - (a.rating || 0);
-        case 'distance':
-        default:
-          if (!userLocation) return 0;
-          const distA = calculateDistance(a.location) || Infinity;
-          const distB = calculateDistance(b.location) || Infinity;
-          return distA - distB;
+      if (sortBy === 'price') {
+        return a.pricePerHour - b.pricePerHour;
       }
+
+      if (sortBy === 'rating') {
+        return (b.rating || 0) - (a.rating || 0);
+      }
+
+      if (!userLocation) {
+        return 0;
+      }
+
+      return (calculateDistance(a.location) || Infinity) - (calculateDistance(b.location) || Infinity);
     });
 
     return results;
   }, [spots, searchQuery, maxPrice, maxDistance, selectedSpotTypes, sortBy, userLocation, calculateDistance]);
 
-  // Handle spot press
-  const handleSpotPress = useCallback((spotId: string) => {
-    navigation.navigate('SpotDetails', { spotId });
-  }, [navigation]);
-
-  // Clear all filters
-  const handleClearFilters = () => {
+  const clearFilters = () => {
     setSearchQuery('');
     setMaxPrice(50);
     setMaxDistance(25);
@@ -141,229 +110,158 @@ export const SearchScreen: React.FC = () => {
     setSortBy('distance');
   };
 
-  // Render spot item
-  const renderSpotItem = useCallback(
-    ({ item }: { item: ParkingSpot }) => {
-      const distance = calculateDistance(item.location);
-      return (
-        <View style={styles.spotItem}>
-          <ParkingSpotCard
-            spot={item}
-            distance={distance}
-            onPress={() => handleSpotPress(item.id)}
-          />
-        </View>
-      );
-    },
-    [calculateDistance, handleSpotPress]
-  );
-
-  // Render empty state
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="search-outline" size={64} color={COLORS.gray[300]} />
-      <Text style={styles.emptyTitle}>No Results Found</Text>
-      <Text style={styles.emptySubtitle}>
-        Try adjusting your search or filters to find parking spots.
-      </Text>
-      <Button
-        title="Clear Filters"
-        onPress={handleClearFilters}
-        variant="outline"
-        style={styles.clearButton}
-      />
-    </View>
-  );
-
-  // Render loading skeletons
-  const renderLoading = () => (
-    <View style={styles.loadingContainer}>
-      {[1, 2, 3].map((i) => (
-        <CardSkeleton key={i} />
-      ))}
-    </View>
-  );
-
-  // Filter option button component
-  const FilterOption = ({
-    label,
-    selected,
-    onPress
-  }: {
-    label: string;
-    selected: boolean;
-    onPress: () => void;
-  }) => (
-    <TouchableOpacity
-      style={[styles.filterOption, selected && styles.filterOptionSelected]}
-      onPress={onPress}
-    >
-      <Text style={[styles.filterOptionText, selected && styles.filterOptionTextSelected]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
+  const renderSpot = useCallback(
+    ({ item }: { item: ParkingSpot }) => (
+      <View style={styles.spotItem}>
+        <ParkingSpotCard
+          spot={item}
+          distance={calculateDistance(item.location)}
+          onPress={() => navigation.navigate('SpotDetails', { spotId: item.id })}
+        />
+      </View>
+    ),
+    [calculateDistance, navigation, styles.spotItem]
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Search</Text>
+        <Text style={styles.title}>Search</Text>
+        <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)} activeOpacity={0.85}>
+          <Ionicons name="options-outline" size={20} color={theme.colors.primary} />
+        </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
+      <View style={styles.searchWrap}>
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color={COLORS.gray[400]} />
+          <Ionicons name="search" size={18} color={theme.colors.textMuted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by location, name..."
-            placeholderTextColor={COLORS.gray[400]}
+            placeholder="Search by area, address, or listing name"
+            placeholderTextColor={theme.colors.inputPlaceholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color={COLORS.gray[400]} />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.8}>
+              <Ionicons name="close-circle" size={18} color={theme.colors.textMuted} />
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowFilters(true)}
-        >
-          <Ionicons name="options-outline" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
       </View>
 
-      {/* Active Filters */}
-      <View style={styles.activeFilters}>
-        <TouchableOpacity
-          style={[styles.filterChip, sortBy === 'distance' && styles.filterChipActive]}
-          onPress={() => setSortBy('distance')}
-        >
-          <Ionicons
-            name="location-outline"
-            size={16}
-            color={sortBy === 'distance' ? COLORS.white : COLORS.textSecondary}
-          />
-          <Text style={[styles.filterChipText, sortBy === 'distance' && styles.filterChipTextActive]}>
-            Nearby
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.filterChip, sortBy === 'price' && styles.filterChipActive]}
-          onPress={() => setSortBy('price')}
-        >
-          <Ionicons
-            name="cash-outline"
-            size={16}
-            color={sortBy === 'price' ? COLORS.white : COLORS.textSecondary}
-          />
-          <Text style={[styles.filterChipText, sortBy === 'price' && styles.filterChipTextActive]}>
-            Price
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.filterChip, sortBy === 'rating' && styles.filterChipActive]}
-          onPress={() => setSortBy('rating')}
-        >
-          <Ionicons
-            name="star-outline"
-            size={16}
-            color={sortBy === 'rating' ? COLORS.white : COLORS.textSecondary}
-          />
-          <Text style={[styles.filterChipText, sortBy === 'rating' && styles.filterChipTextActive]}>
-            Rating
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.sortRow}>
+        {[
+          { key: 'distance', icon: 'locate-outline', label: 'Nearby' },
+          { key: 'price', icon: 'cash-outline', label: 'Price' },
+          { key: 'rating', icon: 'star-outline', label: 'Rating' },
+        ].map((option) => {
+          const selected = sortBy === option.key;
+          return (
+            <TouchableOpacity
+              key={option.key}
+              style={[styles.sortChip, selected && styles.sortChipActive]}
+              onPress={() => setSortBy(option.key as typeof sortBy)}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name={option.icon as keyof typeof Ionicons.glyphMap}
+                size={15}
+                color={selected ? theme.colors.textOnPrimary : theme.colors.textSecondary}
+              />
+              <Text style={[styles.sortChipText, selected && styles.sortChipTextActive]}>{option.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* Results Count */}
       <View style={styles.resultsHeader}>
-        <Text style={styles.resultsCount}>
+        <Text style={styles.resultsText}>
           {filteredSpots.length} {filteredSpots.length === 1 ? 'spot' : 'spots'} found
         </Text>
       </View>
 
-      {/* Results List */}
       {isLoading ? (
-        renderLoading()
+        <View style={styles.skeletonWrap}>
+          {[1, 2, 3].map((key) => <CardSkeleton key={key} />)}
+        </View>
       ) : (
         <FlatList
           data={filteredSpots}
-          renderItem={renderSpotItem}
           keyExtractor={(item) => item.id}
+          renderItem={renderSpot}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={renderEmptyState}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="search-outline" size={44} color={theme.colors.textMuted} />
+              <Text style={styles.emptyTitle}>No matches right now</Text>
+              <Text style={styles.emptySubtitle}>Try expanding your price or distance filters.</Text>
+              <Button title="Clear Filters" onPress={clearFilters} variant="outline" />
+            </View>
+          }
         />
       )}
 
-      {/* Filter Modal */}
-      <Modal
-        visible={showFilters}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowFilters(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
+      <Modal visible={showFilters} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowFilters(false)}>
+        <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowFilters(false)}>
-              <Ionicons name="close" size={28} color={COLORS.textPrimary} />
+            <TouchableOpacity onPress={() => setShowFilters(false)} activeOpacity={0.85}>
+              <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Filters</Text>
-            <TouchableOpacity onPress={handleClearFilters}>
-              <Text style={styles.clearText}>Clear</Text>
+            <TouchableOpacity onPress={clearFilters} activeOpacity={0.85}>
+              <Text style={styles.clearText}>Reset</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent}>
-            {/* Price Filter */}
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Maximum Price per Hour</Text>
-              <View style={styles.filterOptionsRow}>
-                {priceOptions.map((option) => (
-                  <FilterOption
-                    key={option.value}
-                    label={option.label}
-                    selected={maxPrice === parseInt(option.value)}
-                    onPress={() => setMaxPrice(parseInt(option.value))}
-                  />
-                ))}
+              <Text style={styles.filterLabel}>Max price</Text>
+              <View style={styles.optionRow}>
+                {priceOptions.map((option) => {
+                  const selected = maxPrice === Number(option.value);
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[styles.optionChip, selected && styles.optionChipActive]}
+                      onPress={() => setMaxPrice(Number(option.value))}
+                    >
+                      <Text style={[styles.optionText, selected && styles.optionTextActive]}>{option.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
-            {/* Distance Filter */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Maximum Distance</Text>
-              <View style={styles.filterOptionsRow}>
-                {distanceOptions.map((option) => (
-                  <FilterOption
-                    key={option.value}
-                    label={option.label}
-                    selected={maxDistance === parseInt(option.value)}
-                    onPress={() => setMaxDistance(parseInt(option.value))}
-                  />
-                ))}
+              <Text style={styles.filterLabel}>Max distance</Text>
+              <View style={styles.optionRow}>
+                {distanceOptions.map((option) => {
+                  const selected = maxDistance === Number(option.value);
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[styles.optionChip, selected && styles.optionChipActive]}
+                      onPress={() => setMaxDistance(Number(option.value))}
+                    >
+                      <Text style={[styles.optionText, selected && styles.optionTextActive]}>{option.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
-            {/* Spot Type Filter */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Spot Type</Text>
+              <Text style={styles.filterLabel}>Spot type</Text>
               <ChipGroup
                 items={spotTypeOptions}
                 selectedValues={selectedSpotTypes}
                 onSelectionChange={(values) => {
-                  if (values.includes('all') && !selectedSpotTypes.includes('all')) {
-                    setSelectedSpotTypes(['all']);
-                  } else if (values.length === 0) {
+                  if (values.includes('all') || values.length === 0) {
                     setSelectedSpotTypes(['all']);
                   } else {
-                    setSelectedSpotTypes(values.filter((v) => v !== 'all'));
+                    setSelectedSpotTypes(values.filter((value) => value !== 'all'));
                   }
                 }}
                 multiSelect
@@ -372,12 +270,7 @@ export const SearchScreen: React.FC = () => {
           </ScrollView>
 
           <View style={styles.modalFooter}>
-            <Button
-              title={`Show ${filteredSpots.length} Results`}
-              onPress={() => setShowFilters(false)}
-              fullWidth
-              size="large"
-            />
+            <Button title={`Show ${filteredSpots.length} Results`} onPress={() => setShowFilters(false)} fullWidth size="large" />
           </View>
         </SafeAreaView>
       </Modal>
@@ -385,191 +278,193 @@ export const SearchScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  headerTitle: {
-    fontSize: FONTS.sizes.xxl,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.textPrimary,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.lg,
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  searchBar: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING.md,
-    ...SHADOWS.sm,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    marginLeft: SPACING.sm,
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textPrimary,
-  },
-  filterButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...SHADOWS.sm,
-  },
-  activeFilters: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.lg,
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
-    borderColor: COLORS.gray[200],
-  },
-  filterChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  filterChipText: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textSecondary,
-  },
-  filterChipTextActive: {
-    color: COLORS.white,
-  },
-  resultsHeader: {
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-  },
-  resultsCount: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textMuted,
-  },
-  listContent: {
-    padding: SPACING.lg,
-    paddingTop: 0,
-    flexGrow: 1,
-  },
-  spotItem: {
-    marginBottom: SPACING.md,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING.xl,
-    marginTop: SPACING.xxl,
-  },
-  emptyTitle: {
-    fontSize: FONTS.sizes.xl,
-    fontWeight: FONTS.weights.semibold,
-    color: COLORS.textPrimary,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.sm,
-  },
-  emptySubtitle: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginBottom: SPACING.lg,
-  },
-  clearButton: {
-    minWidth: 150,
-  },
-  loadingContainer: {
-    padding: SPACING.lg,
-  },
-
-  // Modal styles
-  modalContainer: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
-  },
-  modalTitle: {
-    fontSize: FONTS.sizes.lg,
-    fontWeight: FONTS.weights.semibold,
-    color: COLORS.textPrimary,
-  },
-  clearText: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.primary,
-    fontWeight: FONTS.weights.medium,
-  },
-  modalContent: {
-    flex: 1,
-    padding: SPACING.lg,
-  },
-  filterSection: {
-    marginBottom: SPACING.xl,
-  },
-  filterLabel: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.semibold,
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
-  },
-  filterOptionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
-  filterOption: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.gray[200],
-  },
-  filterOptionSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  filterOptionText: {
-    fontSize: FONTS.sizes.sm,
-    fontWeight: FONTS.weights.medium,
-    color: COLORS.textSecondary,
-  },
-  filterOptionTextSelected: {
-    color: COLORS.white,
-  },
-  modalFooter: {
-    padding: SPACING.lg,
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray[200],
-  },
-});
+const createStyles = ({ colors, spacing, radii, typography, shadows }: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+    },
+    title: {
+      color: colors.textPrimary,
+      fontSize: typography.sizes.xxl,
+      fontWeight: typography.weights.heavy,
+    },
+    filterButton: {
+      width: 44,
+      height: 44,
+      borderRadius: radii.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    searchWrap: {
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    searchBar: {
+      minHeight: 52,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.full,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...shadows.sm,
+    },
+    searchInput: {
+      flex: 1,
+      color: colors.textPrimary,
+      fontSize: typography.sizes.md,
+      minHeight: 52,
+    },
+    sortRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    sortChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radii.full,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    sortChipActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    sortChipText: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.sm,
+      fontWeight: typography.weights.semibold,
+    },
+    sortChipTextActive: {
+      color: colors.textOnPrimary,
+    },
+    resultsHeader: {
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+    },
+    resultsText: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.sm,
+    },
+    listContent: {
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.xxl,
+      flexGrow: 1,
+    },
+    spotItem: {
+      marginBottom: spacing.md,
+    },
+    emptyState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingTop: spacing.xxxl,
+      paddingHorizontal: spacing.xl,
+    },
+    emptyTitle: {
+      marginTop: spacing.md,
+      marginBottom: spacing.xs,
+      color: colors.textPrimary,
+      fontSize: typography.sizes.lg,
+      fontWeight: typography.weights.bold,
+    },
+    emptySubtitle: {
+      marginBottom: spacing.lg,
+      color: colors.textSecondary,
+      fontSize: typography.sizes.md,
+      lineHeight: 22,
+      textAlign: 'center',
+    },
+    skeletonWrap: {
+      paddingHorizontal: spacing.lg,
+    },
+    modalContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    modalTitle: {
+      color: colors.textPrimary,
+      fontSize: typography.sizes.lg,
+      fontWeight: typography.weights.bold,
+    },
+    clearText: {
+      color: colors.primary,
+      fontSize: typography.sizes.sm,
+      fontWeight: typography.weights.bold,
+    },
+    modalContent: {
+      padding: spacing.lg,
+      paddingBottom: spacing.xxl,
+    },
+    filterSection: {
+      marginBottom: spacing.xl,
+    },
+    filterLabel: {
+      marginBottom: spacing.md,
+      color: colors.textPrimary,
+      fontSize: typography.sizes.md,
+      fontWeight: typography.weights.bold,
+    },
+    optionRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    optionChip: {
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceElevated,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    optionChipActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
+    optionText: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.sm,
+      fontWeight: typography.weights.semibold,
+    },
+    optionTextActive: {
+      color: colors.textOnPrimary,
+    },
+    modalFooter: {
+      padding: spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+  });
 
 export default SearchScreen;

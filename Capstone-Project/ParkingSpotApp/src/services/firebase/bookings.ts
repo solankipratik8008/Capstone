@@ -7,7 +7,6 @@ import {
   collection,
   doc,
   addDoc,
-  getDoc,
   getDocs,
   updateDoc,
   query,
@@ -17,10 +16,10 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-
-const CLOUD_RUN_URL = 'https://parkspot-api-ccxrzypu3a-uc.a.run.app';
 import { db } from './config';
 import { Booking, BookingStatus } from '../../constants';
+
+const CLOUD_RUN_URL = 'https://parkspot-api-ccxrzypu3a-uc.a.run.app';
 
 const BOOKINGS = 'bookings';
 

@@ -19,6 +19,6 @@
       "@navigation/*": ["src/navigation/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
+  "include": ["App.tsx", "config.ts", "src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules", "src/view", "src/controller", "src/model"]
 }

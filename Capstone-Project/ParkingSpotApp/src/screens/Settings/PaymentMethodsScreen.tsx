@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.gray[100],
+    backgroundColor: COLORS.background, borderBottomWidth: 1, borderBottomColor: COLORS.border,
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary },
@@ -167,16 +167,16 @@ const styles = StyleSheet.create({
   },
   cardChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg,
     paddingVertical: SPACING.sm, paddingHorizontal: SPACING.md,
-    borderWidth: 1, borderColor: COLORS.gray[200], ...SHADOWS.sm,
+    borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm,
   },
   cardChipIcon: { fontSize: 16 },
   cardChipName: { fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.medium, color: COLORS.textPrimary },
   stepCard: {
     flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md,
-    backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md, marginBottom: SPACING.sm, ...SHADOWS.sm,
+    backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md, marginBottom: SPACING.sm, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm,
   },
   stepBadge: {
     width: 32, height: 32, borderRadius: 16,
@@ -194,8 +194,8 @@ const styles = StyleSheet.create({
   infoDesc: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, lineHeight: 20 },
   securityRow: {
     flexDirection: 'row', justifyContent: 'space-around',
-    backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg,
-    paddingVertical: SPACING.md, marginBottom: SPACING.md, ...SHADOWS.sm,
+    backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: SPACING.md, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm,
   },
   securityBadge: { alignItems: 'center', gap: 4 },
   securityText: { fontSize: FONTS.sizes.xs, fontWeight: FONTS.weights.medium, color: COLORS.textSecondary },

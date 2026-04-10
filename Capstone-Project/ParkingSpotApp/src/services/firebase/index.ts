@@ -18,6 +18,7 @@ export {
   updateUserData,
   subscribeToAuthState,
   getCurrentFirebaseUser,
+  getUserByPhone,
 } from './auth';
 
 // Parking spots services

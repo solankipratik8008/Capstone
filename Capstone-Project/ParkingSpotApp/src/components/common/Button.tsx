@@ -1,18 +1,14 @@
-/**
- * Custom Button Component
- * Reusable button with various styles and states
- */
-
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
-  TouchableOpacity,
-  Text,
-  StyleSheet,
   ActivityIndicator,
-  ViewStyle,
+  Pressable,
+  StyleSheet,
+  Text,
   TextStyle,
+  ViewStyle,
 } from 'react-native';
-import { COLORS, SPACING, BORDER_RADIUS, FONTS, SHADOWS } from '../../constants';
+
+import { useAppTheme } from '../../theme';
 
 interface ButtonProps {
   title: string;
@@ -39,175 +35,135 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const isDisabled = disabled || loading;
 
-  // Get variant style key
-  const getVariantStyle = () => {
-    switch (variant) {
-      case 'primary': return styles.primary;
-      case 'secondary': return styles.secondary;
-      case 'outline': return styles.outline;
-      case 'text': return styles.textVariant;
-      default: return styles.primary;
-    }
-  };
-
-  // Get size style key
-  const getSizeStyle = () => {
-    switch (size) {
-      case 'small': return styles.smallButton;
-      case 'medium': return styles.mediumButton;
-      case 'large': return styles.largeButton;
-      default: return styles.mediumButton;
-    }
-  };
-
-  // Get text variant style
-  const getTextVariantStyle = () => {
-    switch (variant) {
-      case 'primary': return styles.primaryText;
-      case 'secondary': return styles.secondaryText;
-      case 'outline': return styles.outlineText;
-      case 'text': return styles.textVariantText;
-      default: return styles.primaryText;
-    }
-  };
-
-  // Get text size style
-  const getTextSizeStyle = () => {
-    switch (size) {
-      case 'small': return styles.smallText;
-      case 'medium': return styles.mediumText;
-      case 'large': return styles.largeText;
-      default: return styles.mediumText;
-    }
-  };
-
-  const buttonStyles = [
-    styles.base,
-    getVariantStyle(),
-    getSizeStyle(),
-    fullWidth && styles.fullWidth,
-    isDisabled && styles.disabled,
-    isDisabled && variant === 'outline' && styles.disabledOutline,
-    style,
-  ];
-
-  const textStyles = [
-    styles.baseText,
-    getTextVariantStyle(),
-    getTextSizeStyle(),
-    isDisabled && styles.disabledText,
-    textStyle,
-  ];
-
   return (
-    <TouchableOpacity
-      style={buttonStyles}
+    <Pressable
+      style={({ pressed }) => [
+        styles.base,
+        styles[`variant_${variant}`],
+        styles[`size_${size}`],
+        fullWidth && styles.fullWidth,
+        pressed && !isDisabled && styles.pressed,
+        isDisabled && styles.disabled,
+        variant === 'outline' && isDisabled && styles.disabledOutline,
+        style,
+      ]}
       onPress={onPress}
       disabled={isDisabled}
-      activeOpacity={0.7}
     >
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'outline' || variant === 'text' ? COLORS.primary : COLORS.white}
+          color={variant === 'primary' ? theme.colors.textOnPrimary : theme.colors.primary}
         />
       ) : (
         <>
-          {icon && icon}
-          <Text style={textStyles}>{title}</Text>
+          {icon}
+          <Text
+            style={[
+              styles.textBase,
+              styles[`text_${variant}`],
+              styles[`textSize_${size}`],
+              isDisabled && styles.textDisabled,
+              textStyle,
+            ]}
+          >
+            {title}
+          </Text>
         </>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
-const styles = StyleSheet.create({
-  base: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    gap: SPACING.sm,
-  },
-  fullWidth: {
-    width: '100%',
-  },
-
-  // Variants
-  primary: {
-    backgroundColor: COLORS.primary,
-    ...SHADOWS.sm,
-  },
-  secondary: {
-    backgroundColor: COLORS.secondary,
-    ...SHADOWS.sm,
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
-  },
-  textVariant: {
-    backgroundColor: 'transparent',
-  },
-
-  // Sizes
-  smallButton: {
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-  },
-  mediumButton: {
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-  },
-  largeButton: {
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
-  },
-
-  // Text base
-  baseText: {
-    fontWeight: FONTS.weights.semibold,
-  },
-
-  // Text variants
-  primaryText: {
-    color: COLORS.white,
-  },
-  secondaryText: {
-    color: COLORS.white,
-  },
-  outlineText: {
-    color: COLORS.primary,
-  },
-  textVariantText: {
-    color: COLORS.primary,
-  },
-
-  // Text sizes
-  smallText: {
-    fontSize: FONTS.sizes.sm,
-  },
-  mediumText: {
-    fontSize: FONTS.sizes.md,
-  },
-  largeText: {
-    fontSize: FONTS.sizes.lg,
-  },
-
-  // Disabled state
-  disabled: {
-    backgroundColor: COLORS.gray[300],
-  },
-  disabledOutline: {
-    backgroundColor: 'transparent',
-    borderColor: COLORS.gray[300],
-  },
-  disabledText: {
-    color: COLORS.gray[500],
-  },
-});
+const createStyles = ({ colors, radii, spacing, typography, shadows }: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    base: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: spacing.sm,
+      borderRadius: radii.lg,
+    },
+    fullWidth: {
+      width: '100%',
+    },
+    variant_primary: {
+      backgroundColor: colors.primary,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      ...shadows.glow,
+    },
+    variant_secondary: {
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...shadows.xs,
+    },
+    variant_outline: {
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+    },
+    variant_text: {
+      backgroundColor: 'transparent',
+    },
+    size_small: {
+      minHeight: 40,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    size_medium: {
+      minHeight: 48,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+    },
+    size_large: {
+      minHeight: 56,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.md,
+    },
+    pressed: {
+      opacity: 0.9,
+      transform: [{ scale: 0.99 }],
+    },
+    disabled: {
+      opacity: 0.55,
+    },
+    disabledOutline: {
+      borderColor: colors.borderStrong,
+    },
+    textBase: {
+      fontWeight: typography.weights.bold,
+      letterSpacing: 0.2,
+    },
+    text_primary: {
+      color: colors.textOnPrimary,
+    },
+    text_secondary: {
+      color: colors.textPrimary,
+    },
+    text_outline: {
+      color: colors.primary,
+    },
+    text_text: {
+      color: colors.primary,
+    },
+    textSize_small: {
+      fontSize: typography.sizes.sm,
+    },
+    textSize_medium: {
+      fontSize: typography.sizes.md,
+    },
+    textSize_large: {
+      fontSize: typography.sizes.lg,
+    },
+    textDisabled: {
+      color: colors.textMuted,
+    },
+  });
 
 export default Button;

@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.gray[100],
+    backgroundColor: COLORS.background, borderBottomWidth: 1, borderBottomColor: COLORS.border,
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary },
@@ -145,8 +145,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md, textTransform: 'uppercase', letterSpacing: 0.5,
   },
   faqItem: {
-    backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md, marginBottom: SPACING.sm, ...SHADOWS.sm,
+    backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md, marginBottom: SPACING.sm, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm,
   },
   faqItemOpen: { borderLeftWidth: 3, borderLeftColor: COLORS.primary },
   faqHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

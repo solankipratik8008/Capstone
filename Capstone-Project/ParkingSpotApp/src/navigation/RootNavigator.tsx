@@ -11,6 +11,7 @@ import { AuthNavigator } from './AuthNavigator';
 import { MainTabNavigator } from './MainTabNavigator';
 import { useAuth } from '../context';
 import { Loading } from '../components/common';
+import { useAppTheme } from '../theme';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -21,14 +22,15 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const RootNavigator: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const { navigationTheme } = useAppTheme();
 
   // Show loading screen while checking auth state
   if (isLoading) {
-    return <Loading fullScreen text="Loading..." />;
+    return <Loading fullScreen message="Loading ParkSpot" />;
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           <Stack.Screen name="Main" component={MainTabNavigator} />

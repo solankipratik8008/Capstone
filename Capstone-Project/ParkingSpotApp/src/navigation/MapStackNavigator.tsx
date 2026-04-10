@@ -1,6 +1,5 @@
 /**
- * Map Stack Navigator
- * Stack navigation for map-related screens
+ * Map Stack Navigator — Black + Light Green theme
  */
 
 import React from 'react';
@@ -9,22 +8,24 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeMapScreen from '../screens/Home/HomeMapScreen';
 import SpotDetailsScreen from '../screens/ParkingSpot/SpotDetailsScreen';
 import BookingScreen from '../screens/Booking/BookingScreen';
-import { COLORS } from '../constants';
+import { useAppTheme } from '../theme';
 
 export type MapStackParamList = {
   HomeMap: undefined;
   SpotDetails: { spotId: string };
-  Booking: { spotId: string; spotTitle: string; pricePerHour: number; ownerId: string };
+  Booking: { spotId: string; spotTitle: string; pricePerHour: number; ownerId: string; isPaidLot?: boolean; placeAddress?: string };
 };
 
 const Stack = createNativeStackNavigator<MapStackParamList>();
 
 export const MapStackNavigator: React.FC = () => {
+  const { colors, isDark } = useAppTheme();
+
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: COLORS.background },
+        contentStyle: { backgroundColor: colors.background },
         animation: 'slide_from_right',
       }}
     >
@@ -36,9 +37,11 @@ export const MapStackNavigator: React.FC = () => {
         options={{
           headerShown: true,
           title: 'Book Spot',
-          headerStyle: { backgroundColor: COLORS.primary },
-          headerTintColor: COLORS.white,
-          headerTitleStyle: { fontWeight: '600' },
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.textPrimary,
+          headerTitleStyle: { fontWeight: '700', color: colors.textPrimary },
+          headerShadowVisible: false,
+          statusBarStyle: isDark ? 'light' : 'dark',
         }}
       />
     </Stack.Navigator>

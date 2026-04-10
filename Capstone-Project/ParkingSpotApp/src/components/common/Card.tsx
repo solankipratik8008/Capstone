@@ -1,11 +1,7 @@
-/**
- * Card Component
- * Reusable card container with optional press handling
- */
+import React, { ReactNode, useMemo } from 'react';
+import { Pressable, StyleSheet, View, ViewStyle } from 'react-native';
 
-import React, { ReactNode } from 'react';
-import { View, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
-import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../constants';
+import { useAppTheme } from '../../theme';
 
 interface CardProps {
   children: ReactNode;
@@ -22,59 +18,62 @@ export const Card: React.FC<CardProps> = ({
   variant = 'elevated',
   padding = 'medium',
 }) => {
-  const cardStyles = [
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const cardStyle = [
     styles.base,
-    styles[variant],
+    styles[`variant_${variant}`],
     styles[`padding_${padding}`],
     style,
   ];
 
-  if (onPress) {
-    return (
-      <TouchableOpacity
-        style={cardStyles}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
-        {children}
-      </TouchableOpacity>
-    );
+  if (!onPress) {
+    return <View style={cardStyle}>{children}</View>;
   }
 
-  return <View style={cardStyles}>{children}</View>;
+  return (
+    <Pressable
+      style={({ pressed }) => [cardStyle, pressed && styles.pressed]}
+      onPress={onPress}
+    >
+      {children}
+    </Pressable>
+  );
 };
 
-const styles = StyleSheet.create({
-  base: {
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.white,
-  },
-
-  // Variants
-  elevated: {
-    ...SHADOWS.md,
-  },
-  outlined: {
-    borderWidth: 1,
-    borderColor: COLORS.gray[200],
-  },
-  filled: {
-    backgroundColor: COLORS.gray[50],
-  },
-
-  // Padding
-  padding_none: {
-    padding: 0,
-  },
-  padding_small: {
-    padding: SPACING.sm,
-  },
-  padding_medium: {
-    padding: SPACING.md,
-  },
-  padding_large: {
-    padding: SPACING.lg,
-  },
-});
+const createStyles = ({ colors, radii, spacing, shadows }: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    base: {
+      borderRadius: radii.xl,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    variant_elevated: {
+      ...shadows.sm,
+    },
+    variant_outlined: {
+      backgroundColor: colors.surface,
+    },
+    variant_filled: {
+      backgroundColor: colors.surfaceMuted,
+      borderColor: colors.surfaceMuted,
+    },
+    padding_none: {
+      padding: 0,
+    },
+    padding_small: {
+      padding: spacing.sm,
+    },
+    padding_medium: {
+      padding: spacing.md,
+    },
+    padding_large: {
+      padding: spacing.lg,
+    },
+    pressed: {
+      opacity: 0.95,
+    },
+  });
 
 export default Card;

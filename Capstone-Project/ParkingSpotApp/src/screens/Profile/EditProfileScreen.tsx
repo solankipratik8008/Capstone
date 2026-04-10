@@ -46,7 +46,7 @@ export const EditProfileScreen: React.FC = () => {
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -60,7 +60,7 @@ export const EditProfileScreen: React.FC = () => {
           setProfileImage(downloadURL);
           await updateUserProfile({ photoURL: downloadURL });
         }
-      } catch (error) {
+      } catch {
         Alert.alert('Error', 'Failed to upload profile picture.');
       } finally {
         setIsUploadingImage(false);
@@ -215,9 +215,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
+    borderBottomColor: COLORS.border,
   },
   headerTitle: {
     fontSize: FONTS.sizes.lg,
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: COLORS.gray[200],
+    backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -256,8 +256,10 @@ const styles = StyleSheet.create({
   readOnlyField: {
     marginBottom: SPACING.md,
     padding: SPACING.md,
-    backgroundColor: COLORS.gray[100],
+    backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   readOnlyLabel: {
     fontSize: FONTS.sizes.sm,

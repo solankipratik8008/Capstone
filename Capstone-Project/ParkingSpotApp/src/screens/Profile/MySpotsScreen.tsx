@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ParkingSpotCard } from '../../components/parking';
 import { Button, Loading } from '../../components/common';
 import { useParkingSpots, useAuth } from '../../context';
-import { COLORS, SPACING, FONTS, ParkingSpot } from '../../constants';
+import { BORDER_RADIUS, COLORS, SPACING, FONTS, ParkingSpot } from '../../constants';
 import { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 
 type NavigationProp = NativeStackNavigationProp<ProfileStackParamList>;
@@ -156,9 +156,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
+    borderBottomColor: COLORS.border,
   },
   headerTitle: {
     fontSize: FONTS.sizes.lg,
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: SPACING.md,
-    marginTop: -SPACING.sm,
+    marginTop: SPACING.sm,
     paddingHorizontal: SPACING.sm,
   },
   actionButton: {
@@ -185,6 +185,10 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     paddingVertical: SPACING.xs,
     paddingHorizontal: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   actionText: {
     fontSize: FONTS.sizes.sm,

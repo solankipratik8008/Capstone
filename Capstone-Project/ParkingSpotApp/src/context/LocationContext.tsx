@@ -4,7 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { Alert, Linking } from 'react-native';
+import { Alert } from 'react-native';
 import * as ExpoLocation from 'expo-location';
 import { Location, LocationContextType } from '../constants';
 import { calculateDistance as calcDist } from '../services/firebase';

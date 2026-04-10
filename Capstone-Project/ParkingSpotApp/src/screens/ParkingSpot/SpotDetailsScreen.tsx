@@ -1,41 +1,28 @@
-/**
- * Spot Details Screen
- * Displays detailed information about a parking spot
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Image,
-  TouchableOpacity,
-  Dimensions,
-  Linking,
-  Alert,
   ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
-import { Button, Badge, Loading, Avatar } from '../../components/common';
-import { useParkingSpots, useLocation, useAuth } from '../../context';
-import {
-  COLORS,
-  SPACING,
-  FONTS,
-  BORDER_RADIUS,
-  SHADOWS,
-  SPOT_TYPE_LABELS,
-  AMENITY_LABELS,
-  ParkingSpot,
-} from '../../constants';
-import { MapStackParamList } from '../../navigation/MapStackNavigator';
+import { Avatar, Badge, Button, Card, Loading } from '../../components/common';
+import { AMENITY_LABELS, ParkingSpot, SPOT_TYPE_LABELS } from '../../constants';
+import { useAuth, useLocation, useParkingSpots } from '../../context';
 import { getOrCreateChat } from '../../services/firebase/chat';
+import { useAppTheme } from '../../theme';
+import { MapStackParamList } from '../../navigation/MapStackNavigator';
 
 const { width } = Dimensions.get('window');
 
@@ -45,8 +32,10 @@ type NavProp = NativeStackNavigationProp<MapStackParamList>;
 export const SpotDetailsScreen: React.FC = () => {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<RouteProps>();
-  const { spotId } = route.params;
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
+  const { spotId } = route.params;
   const { getSpotById } = useParkingSpots();
   const { calculateDistance } = useLocation();
   const { user } = useAuth();
@@ -56,40 +45,40 @@ export const SpotDetailsScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isChatLoading, setIsChatLoading] = useState(false);
 
-  // Fetch spot data
   useEffect(() => {
-    const spotData = getSpotById(spotId);
-    setSpot(spotData);
+    setSpot(getSpotById(spotId));
     setIsLoading(false);
-  }, [spotId, getSpotById]);
+  }, [getSpotById, spotId]);
 
-  // Open directions in maps app
-  const handleGetDirections = () => {
-    if (!spot) return;
+  const openDirections = async () => {
+    if (!spot) {
+      return;
+    }
 
-    const { latitude, longitude } = spot.location;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-
-    Linking.canOpenURL(url).then((supported) => {
-      if (supported) {
-        Linking.openURL(url);
-      } else {
-        Alert.alert('Error', 'Unable to open maps application');
-      }
-    });
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${spot.location.latitude},${spot.location.longitude}`;
+    const supported = await Linking.canOpenURL(url).catch(() => false);
+    if (!supported) {
+      Alert.alert('Directions unavailable', 'Could not open your maps app.');
+      return;
+    }
+    Linking.openURL(url);
   };
 
-  // Open chat with owner
-  const handleContactOwner = async () => {
+  const openChat = async () => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to message the owner.');
+      Alert.alert('Sign in required', 'Please sign in to message the host.');
       return;
     }
-    if (!spot) return;
-    if (user.uid === spot.ownerId) {
-      Alert.alert('This is your spot', 'You cannot message yourself.');
+
+    if (!spot) {
       return;
     }
+
+    if (spot.ownerId === user.uid) {
+      Alert.alert('This is your listing', 'You cannot message yourself.');
+      return;
+    }
+
     setIsChatLoading(true);
     try {
       const chatId = await getOrCreateChat(
@@ -102,25 +91,28 @@ export const SpotDetailsScreen: React.FC = () => {
         user.photoURL,
         undefined
       );
-      // Navigate to Chat screen in the MessagesTab
+
       (navigation as any).navigate('MessagesTab', {
         screen: 'Chat',
         params: { chatId, otherUserName: spot.ownerName, spotTitle: spot.title },
       });
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Could not start conversation.');
+      Alert.alert('Could not start chat', error.message || 'Please try again.');
     } finally {
       setIsChatLoading(false);
     }
   };
 
-  // Navigate to booking screen
-  const handleBookNow = () => {
-    if (!spot) return;
-    if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to book a spot.');
+  const bookNow = () => {
+    if (!spot) {
       return;
     }
+
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to book this spot.');
+      return;
+    }
+
     navigation.navigate('Booking', {
       spotId: spot.id,
       spotTitle: spot.title,
@@ -130,448 +122,389 @@ export const SpotDetailsScreen: React.FC = () => {
   };
 
   if (isLoading) {
-    return <Loading fullScreen text="Loading spot details..." />;
+    return <Loading fullScreen message="Loading spot details" />;
   }
 
   if (!spot) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={64} color={COLORS.gray[400]} />
-          <Text style={styles.errorText}>Parking spot not found</Text>
-          <Button
-            title="Go Back"
-            onPress={() => navigation.goBack()}
-            variant="outline"
-          />
-        </View>
+      <SafeAreaView style={styles.center}>
+        <Ionicons name="alert-circle-outline" size={48} color={theme.colors.textMuted} />
+        <Text style={styles.errorTitle}>Parking spot not found</Text>
+        <Button title="Go Back" onPress={() => navigation.goBack()} variant="outline" />
       </SafeAreaView>
     );
   }
 
   const distance = calculateDistance(spot.location);
-  const images = spot.imageURLs.length > 0
-    ? spot.imageURLs
-    : ['https://via.placeholder.com/400x300?text=No+Image'];
+  const images = spot.imageURLs.length > 0 ? spot.imageURLs : ['https://via.placeholder.com/1200x800/E5E7EB/6B7280?text=ParkSpot'];
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Image Gallery */}
-        <View style={styles.imageContainer}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.gallery}>
           <ScrollView
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(e) => {
-              const index = Math.round(e.nativeEvent.contentOffset.x / width);
+            onMomentumScrollEnd={(event) => {
+              const index = Math.round(event.nativeEvent.contentOffset.x / width);
               setCurrentImageIndex(index);
             }}
           >
             {images.map((uri, index) => (
-              <Image
-                key={index}
-                source={{ uri }}
-                style={styles.image}
-                resizeMode="cover"
-              />
+              <Image key={index} source={{ uri }} style={styles.galleryImage} />
             ))}
           </ScrollView>
 
-          {/* Image indicator dots */}
-          {images.length > 1 && (
-            <View style={styles.imageIndicators}>
-              {images.map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.indicator,
-                    currentImageIndex === index && styles.indicatorActive,
-                  ]}
-                />
-              ))}
-            </View>
-          )}
-
-          {/* Back button */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.85}>
+            <Ionicons name="arrow-back" size={20} color={theme.colors.textPrimary} />
           </TouchableOpacity>
 
-          {/* Availability badge */}
-          <View style={styles.availabilityBadge}>
-            <Badge
-              text={spot.isAvailable ? 'Available' : 'Unavailable'}
-              variant={spot.isAvailable ? 'success' : 'error'}
-            />
+          <View style={styles.galleryMeta}>
+            <Badge text={spot.isAvailable ? 'Available' : 'Unavailable'} variant={spot.isAvailable ? 'success' : 'default'} />
           </View>
+
+          {images.length > 1 ? (
+            <View style={styles.pagination}>
+              {images.map((_, index) => (
+                <View key={index} style={[styles.dot, currentImageIndex === index && styles.dotActive]} />
+              ))}
+            </View>
+          ) : null}
         </View>
 
-        {/* Content */}
-        <View style={styles.content}>
-          {/* Title and Price */}
-          <View style={styles.header}>
-            <View style={styles.titleContainer}>
+        <View style={styles.body}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerCopy}>
               <Text style={styles.title}>{spot.title}</Text>
-              <Text style={styles.spotType}>
-                {SPOT_TYPE_LABELS[spot.spotType] || spot.spotType}
-              </Text>
+              <Text style={styles.subtitle}>{SPOT_TYPE_LABELS[spot.spotType] || spot.spotType}</Text>
             </View>
-            <View style={styles.priceContainer}>
+            <View style={styles.priceWrap}>
               <Text style={styles.price}>${spot.pricePerHour}</Text>
-              <Text style={styles.priceUnit}>/hour</Text>
-              {spot.pricePerDay && (
-                <Text style={styles.priceDaily}>${spot.pricePerDay}/day</Text>
-              )}
+              <Text style={styles.priceUnit}>per hour</Text>
             </View>
           </View>
 
-          {/* Rating and Distance */}
-          <View style={styles.statsRow}>
-            {spot.rating && (
-              <View style={styles.stat}>
-                <Ionicons name="star" size={16} color={COLORS.accent} />
-                <Text style={styles.statText}>
-                  {spot.rating.toFixed(1)} ({spot.reviewCount} reviews)
+          <View style={styles.metaRow}>
+            {distance !== null ? (
+              <View style={styles.metaChip}>
+                <Ionicons name="locate-outline" size={14} color={theme.colors.primary} />
+                <Text style={styles.metaChipText}>
+                  {distance < 1 ? `${Math.round(distance * 1000)} m away` : `${distance.toFixed(1)} km away`}
                 </Text>
               </View>
-            )}
-            {distance !== null && (
-              <View style={styles.stat}>
-                <Ionicons name="location-outline" size={16} color={COLORS.textMuted} />
-                <Text style={styles.statText}>
-                  {distance < 1 ? `${Math.round(distance * 1000)}m` : `${distance.toFixed(1)}km`} away
-                </Text>
+            ) : null}
+
+            {spot.rating ? (
+              <View style={styles.metaChip}>
+                <Ionicons name="star" size={14} color={theme.colors.primary} />
+                <Text style={styles.metaChipText}>{spot.rating.toFixed(1)} rating</Text>
               </View>
-            )}
+            ) : null}
           </View>
 
-          {/* Description */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
-            <Text style={styles.description}>{spot.description}</Text>
-          </View>
+          <Card style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>About this spot</Text>
+            <Text style={styles.sectionText}>{spot.description}</Text>
+          </Card>
 
-          {/* Amenities */}
-          {spot.amenities.length > 0 && (
-            <View style={styles.section}>
+          {spot.amenities.length > 0 ? (
+            <Card style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Amenities</Text>
-              <View style={styles.amenitiesGrid}>
+              <View style={styles.amenityGrid}>
                 {spot.amenities.map((amenity) => (
-                  <View key={amenity} style={styles.amenityItem}>
-                    <Ionicons name="checkmark-circle" size={18} color={COLORS.success} />
-                    <Text style={styles.amenityText}>
-                      {AMENITY_LABELS[amenity] || amenity}
-                    </Text>
+                  <View key={amenity} style={styles.amenityChip}>
+                    <Ionicons name="checkmark-circle-outline" size={16} color={theme.colors.primary} />
+                    <Text style={styles.amenityText}>{AMENITY_LABELS[amenity] || amenity}</Text>
                   </View>
                 ))}
               </View>
-            </View>
-          )}
+            </Card>
+          ) : null}
 
-          {/* Location Map */}
-          <View style={styles.section}>
+          <Card style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Location</Text>
-            <Text style={styles.address}>
-              {spot.location.address || `${spot.location.city}, ${spot.location.state}`}
+            <Text style={styles.sectionText}>
+              {spot.location.address || `${spot.location.city || ''} ${spot.location.state || ''}`.trim()}
             </Text>
-            <View style={styles.mapContainer}>
+            <View style={styles.mapWrap}>
               <MapView
                 style={styles.map}
                 provider={PROVIDER_GOOGLE}
+                scrollEnabled={false}
+                zoomEnabled={false}
                 initialRegion={{
                   latitude: spot.location.latitude,
                   longitude: spot.location.longitude,
-                  latitudeDelta: 0.005,
-                  longitudeDelta: 0.005,
+                  latitudeDelta: 0.004,
+                  longitudeDelta: 0.004,
                 }}
-                scrollEnabled={false}
-                zoomEnabled={false}
               >
                 <Marker
-                  coordinate={{
-                    latitude: spot.location.latitude,
-                    longitude: spot.location.longitude,
-                  }}
+                  coordinate={{ latitude: spot.location.latitude, longitude: spot.location.longitude }}
                 />
               </MapView>
             </View>
-          </View>
+          </Card>
 
-          {/* Owner Info */}
-          <View style={styles.section}>
+          <Card style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Hosted by</Text>
-            <View style={styles.ownerCard}>
+            <View style={styles.hostRow}>
               <Avatar name={spot.ownerName} size="medium" />
-              <View style={styles.ownerInfo}>
-                <Text style={styles.ownerName}>{spot.ownerName}</Text>
-                <Text style={styles.ownerSince}>Member since 2024</Text>
+              <View style={styles.hostInfo}>
+                <Text style={styles.hostName}>{spot.ownerName}</Text>
+                <Text style={styles.hostMeta}>Responsive host on ParkSpot</Text>
               </View>
-              <TouchableOpacity
-                style={styles.messageButton}
-                onPress={handleContactOwner}
-                disabled={isChatLoading}
-              >
+              <TouchableOpacity style={styles.messageButton} onPress={openChat} activeOpacity={0.85}>
                 {isChatLoading ? (
-                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
                 ) : (
-                  <Ionicons name="chatbubble-outline" size={20} color={COLORS.primary} />
+                  <Ionicons name="chatbubble-outline" size={18} color={theme.colors.primary} />
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+          </Card>
         </View>
       </ScrollView>
 
-      {/* Bottom Action Bar */}
-      <SafeAreaView edges={['bottom']} style={styles.bottomBar}>
-        <View style={styles.bottomBarContent}>
-          <View>
-            <Text style={styles.bottomPrice}>${spot.pricePerHour}/hr</Text>
-            {spot.pricePerDay && (
-              <Text style={styles.bottomPriceDaily}>${spot.pricePerDay}/day</Text>
-            )}
-          </View>
-          <View style={styles.bottomButtons}>
-            <Button
-              title="Directions"
-              variant="outline"
-              onPress={handleGetDirections}
-              icon={<Ionicons name="navigate-outline" size={18} color={COLORS.primary} />}
-              style={styles.directionsButton}
-            />
-            <Button
-              title="Book Now"
-              onPress={handleBookNow}
-              disabled={!spot.isAvailable}
-            />
-          </View>
+      <SafeAreaView edges={['bottom']} style={styles.footer}>
+        <View>
+          <Text style={styles.footerPrice}>${spot.pricePerHour}/hr</Text>
+          {spot.pricePerDay ? <Text style={styles.footerSubprice}>${spot.pricePerDay}/day</Text> : null}
+        </View>
+        <View style={styles.footerActions}>
+          <Button
+            title="Directions"
+            onPress={openDirections}
+            variant="outline"
+            icon={<Ionicons name="navigate-outline" size={16} color={theme.colors.primary} />}
+            style={styles.directionButton}
+          />
+          <Button title="Book Now" onPress={bookNow} disabled={!spot.isAvailable} />
         </View>
       </SafeAreaView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  errorContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING.xl,
-  },
-  errorText: {
-    fontSize: FONTS.sizes.lg,
-    color: COLORS.textSecondary,
-    marginVertical: SPACING.lg,
-  },
-  imageContainer: {
-    position: 'relative',
-    height: 280,
-  },
-  image: {
-    width,
-    height: 280,
-  },
-  imageIndicators: {
-    position: 'absolute',
-    bottom: SPACING.md,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: SPACING.xs,
-  },
-  indicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  indicatorActive: {
-    backgroundColor: COLORS.white,
-    width: 20,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 50,
-    left: SPACING.md,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  availabilityBadge: {
-    position: 'absolute',
-    top: 50,
-    right: SPACING.md,
-  },
-  content: {
-    padding: SPACING.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: SPACING.md,
-  },
-  titleContainer: {
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  title: {
-    fontSize: FONTS.sizes.xxl,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.textPrimary,
-  },
-  spotType: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.primary,
-    fontWeight: FONTS.weights.medium,
-    marginTop: SPACING.xs,
-  },
-  priceContainer: {
-    alignItems: 'flex-end',
-  },
-  price: {
-    fontSize: FONTS.sizes.xxl,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.primary,
-  },
-  priceUnit: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textMuted,
-  },
-  priceDaily: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: SPACING.lg,
-    marginBottom: SPACING.lg,
-  },
-  stat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  statText: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textSecondary,
-  },
-  section: {
-    marginBottom: SPACING.xl,
-  },
-  sectionTitle: {
-    fontSize: FONTS.sizes.lg,
-    fontWeight: FONTS.weights.semibold,
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.sm,
-  },
-  description: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textSecondary,
-    lineHeight: 22,
-  },
-  amenitiesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
-  amenityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    backgroundColor: COLORS.gray[100],
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  amenityText: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textSecondary,
-  },
-  address: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
-  },
-  mapContainer: {
-    height: 150,
-    borderRadius: BORDER_RADIUS.lg,
-    overflow: 'hidden',
-    ...SHADOWS.sm,
-  },
-  map: {
-    flex: 1,
-  },
-  ownerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    ...SHADOWS.sm,
-  },
-  ownerInfo: {
-    flex: 1,
-    marginLeft: SPACING.md,
-  },
-  ownerName: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.semibold,
-    color: COLORS.textPrimary,
-  },
-  ownerSince: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textMuted,
-  },
-  messageButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primary + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomBar: {
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray[200],
-  },
-  bottomBarContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  bottomPrice: {
-    fontSize: FONTS.sizes.lg,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.textPrimary,
-  },
-  bottomPriceDaily: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textMuted,
-  },
-  bottomButtons: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  directionsButton: {
-    minWidth: 100,
-  },
-});
+const createStyles = ({ colors, spacing, radii, typography, shadows }: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      paddingBottom: spacing.xxxl,
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: spacing.xl,
+      backgroundColor: colors.background,
+      gap: spacing.md,
+    },
+    errorTitle: {
+      color: colors.textPrimary,
+      fontSize: typography.sizes.lg,
+      fontWeight: typography.weights.bold,
+    },
+    gallery: {
+      position: 'relative',
+      height: 320,
+    },
+    galleryImage: {
+      width,
+      height: 320,
+      resizeMode: 'cover',
+    },
+    backButton: {
+      position: 'absolute',
+      top: 56,
+      left: spacing.lg,
+      width: 42,
+      height: 42,
+      borderRadius: radii.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    galleryMeta: {
+      position: 'absolute',
+      top: 56,
+      right: spacing.lg,
+    },
+    pagination: {
+      position: 'absolute',
+      bottom: spacing.md,
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: spacing.xs,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: radii.full,
+      backgroundColor: 'rgba(255,255,255,0.45)',
+    },
+    dotActive: {
+      width: 22,
+      backgroundColor: colors.white,
+    },
+    body: {
+      padding: spacing.lg,
+      gap: spacing.lg,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    headerCopy: {
+      flex: 1,
+    },
+    title: {
+      color: colors.textPrimary,
+      fontSize: typography.sizes.xxl,
+      fontWeight: typography.weights.heavy,
+      marginBottom: spacing.xs,
+    },
+    subtitle: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.md,
+      fontWeight: typography.weights.semibold,
+    },
+    priceWrap: {
+      alignItems: 'flex-end',
+    },
+    price: {
+      color: colors.primary,
+      fontSize: typography.sizes.xxl,
+      fontWeight: typography.weights.heavy,
+    },
+    priceUnit: {
+      color: colors.textMuted,
+      fontSize: typography.sizes.sm,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    metaChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      borderRadius: radii.full,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    metaChipText: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.sm,
+      fontWeight: typography.weights.semibold,
+    },
+    sectionCard: {
+      padding: spacing.lg,
+    },
+    sectionTitle: {
+      color: colors.textPrimary,
+      fontSize: typography.sizes.lg,
+      fontWeight: typography.weights.bold,
+      marginBottom: spacing.sm,
+    },
+    sectionText: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.md,
+      lineHeight: 23,
+    },
+    amenityGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    amenityChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      borderRadius: radii.full,
+      backgroundColor: colors.primaryFaint,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    amenityText: {
+      color: colors.primary,
+      fontSize: typography.sizes.sm,
+      fontWeight: typography.weights.semibold,
+    },
+    mapWrap: {
+      marginTop: spacing.md,
+      height: 180,
+      overflow: 'hidden',
+      borderRadius: radii.xl,
+    },
+    map: {
+      flex: 1,
+    },
+    hostRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    hostInfo: {
+      flex: 1,
+      marginLeft: spacing.md,
+    },
+    hostName: {
+      color: colors.textPrimary,
+      fontSize: typography.sizes.md,
+      fontWeight: typography.weights.bold,
+    },
+    hostMeta: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.sm,
+      marginTop: 2,
+    },
+    messageButton: {
+      width: 44,
+      height: 44,
+      borderRadius: radii.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primaryFaint,
+    },
+    footer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    footerPrice: {
+      color: colors.textPrimary,
+      fontSize: typography.sizes.lg,
+      fontWeight: typography.weights.bold,
+    },
+    footerSubprice: {
+      color: colors.textMuted,
+      fontSize: typography.sizes.sm,
+    },
+    footerActions: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    directionButton: {
+      minWidth: 118,
+    },
+  });
 
 export default SpotDetailsScreen;

@@ -16,7 +16,7 @@ import {
   updateUserData,
   subscribeToAuthState,
 } from '../services/firebase';
-import { User, UserRole, AuthContextType } from '../constants';
+import { AppleSignInParams, User, UserRole, AuthContextType } from '../constants';
 
 // Create context with undefined default
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,10 +72,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Sign in with Google
    */
-  const signInWithGoogle = async (idToken: string): Promise<void> => {
+  const signInWithGoogle = async (
+    idToken?: string,
+    accessToken?: string,
+    role?: UserRole
+  ): Promise<void> => {
     setIsLoading(true);
     try {
-      const userData = await firebaseSignInWithGoogle(idToken);
+      const userData = await firebaseSignInWithGoogle(idToken || '', accessToken, role);
       setUser(userData);
     } catch (error) {
       setIsLoading(false);
@@ -86,10 +90,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Sign in with Apple
    */
-  const signInWithApple = async (identityToken: string, nonce: string): Promise<void> => {
+  const signInWithApple = async (params: AppleSignInParams): Promise<void> => {
     setIsLoading(true);
     try {
-      const userData = await firebaseSignInWithApple(identityToken, nonce);
+      const userData = await firebaseSignInWithApple(params);
       setUser(userData);
     } catch (error) {
       setIsLoading(false);
@@ -104,11 +108,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     email: string,
     password: string,
     name: string,
-    role: UserRole
+    role: UserRole,
+    phone?: string,
   ): Promise<void> => {
     setIsLoading(true);
     try {
-      const userData = await firebaseSignUp(email, password, name, role);
+      const userData = await firebaseSignUp(email, password, name, role, phone);
       setUser(userData);
     } catch (error) {
       setIsLoading(false);

@@ -170,7 +170,7 @@ export type ChatStackParamList = {
 };
 
 export type BookingStackParamList = {
-  Booking: { spotId: string; spotTitle: string; pricePerHour: number; ownerId: string };
+  Booking: { spotId: string; spotTitle: string; pricePerHour: number; ownerId: string; isPaidLot?: boolean; placeAddress?: string };
 };
 
 export type MapStackParamList = {
@@ -186,15 +186,23 @@ export type ProfileStackParamList = {
   SpotDetails: { spotId: string };
 };
 
+export interface AppleSignInParams {
+  identityToken: string;
+  nonce: string;
+  email?: string | null;
+  name?: string | null;
+  role?: UserRole;
+}
+
 // Auth context types
 export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: (idToken: string) => Promise<void>;
-  signInWithApple: (identityToken: string, nonce: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
+  signInWithGoogle: (idToken?: string, accessToken?: string, role?: UserRole) => Promise<void>;
+  signInWithApple: (params: AppleSignInParams) => Promise<void>;
+  signUp: (email: string, password: string, name: string, role: UserRole, phone?: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (data: Partial<User>) => Promise<void>;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -34,17 +34,17 @@ const MyBookingsScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
-  const loadBookings = () => {
+  const loadBookings = useCallback(() => {
     if (!user) return;
     getUserBookings(user.uid)
       .then(setBookings)
       .catch((err) => console.error(err))
       .finally(() => setIsLoading(false));
-  };
+  }, [user]);
 
   useEffect(() => {
     loadBookings();
-  }, [user]);
+  }, [loadBookings]);
 
   const formatDate = (date: Date) =>
     date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -197,9 +197,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
+    borderBottomColor: COLORS.border,
   },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary },
@@ -208,9 +208,11 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: FONTS.sizes.md, color: COLORS.textSecondary, textAlign: 'center' },
   list: { padding: SPACING.lg, gap: SPACING.md },
   card: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     ...SHADOWS.sm,
   },
   cardHeader: {

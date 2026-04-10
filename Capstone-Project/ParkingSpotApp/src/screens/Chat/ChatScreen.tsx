@@ -1,100 +1,115 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
   FlatList,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { RouteProp, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+
+import { ChatStackParamList, Message } from '../../constants';
 import { useAuth } from '../../context';
-import { subscribeToMessages, sendMessage, markChatAsRead } from '../../services/firebase/chat';
-import { Message } from '../../constants';
-import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../../constants';
-import { ChatStackParamList } from '../../constants';
+import { markChatAsRead, sendMessage, subscribeToMessages } from '../../services/firebase/chat';
+import { useAppTheme } from '../../theme';
 
 type ChatRouteProp = RouteProp<ChatStackParamList, 'Chat'>;
 
 const ChatScreen: React.FC = () => {
   const { user } = useAuth();
   const route = useRoute<ChatRouteProp>();
-  const { chatId, otherUserName, spotTitle } = route.params;
+  const { chatId, spotTitle } = route.params;
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
-  const [isSending, setIsSending] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const flatListRef = useRef<FlatList>(null);
+  const [isSending, setIsSending] = useState(false);
+  const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
+    if (!chatId) {
+      setIsLoading(false);
+      return;
+    }
+
     const unsubscribe = subscribeToMessages(
       chatId,
-      (updatedMessages) => {
-        setMessages(updatedMessages);
+      (nextMessages) => {
+        setMessages(nextMessages);
         setIsLoading(false);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
       },
-      (error) => {
-        console.error(error);
-        setIsLoading(false);
-      }
+      () => setIsLoading(false)
     );
 
-    // Mark as read when entering chat
-    if (user) markChatAsRead(chatId, user.uid);
+    if (user) {
+      markChatAsRead(chatId, user.uid).catch(() => {});
+    }
 
     return unsubscribe;
   }, [chatId, user]);
 
-  const handleSend = async () => {
-    if (!inputText.trim() || !user || isSending) return;
+  const send = async () => {
+    if (!inputText.trim() || !user || isSending) {
+      return;
+    }
+
     const text = inputText.trim();
     setInputText('');
     setIsSending(true);
+
     try {
       await sendMessage(chatId, user.uid, user.name, text);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      setInputText(text); // restore on failure
+    } catch {
+      setInputText(text);
     } finally {
       setIsSending(false);
     }
   };
 
-  const formatTime = (date: Date): string =>
-    date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const safeTimeString = (createdAt: any): string => {
+    try {
+      const d = createdAt instanceof Date ? createdAt : createdAt?.toDate?.();
+      if (!d || isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  };
 
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
-    const isOwn = item.senderId === user?.uid;
-    const prevMessage = index > 0 ? messages[index - 1] : null;
-    const showSenderName = !isOwn && prevMessage?.senderId !== item.senderId;
+    try {
+      const isMine = item.senderId === user?.uid;
+      const previous = index > 0 ? messages[index - 1] : null;
+      const showSender = !isMine && previous?.senderId !== item.senderId;
 
-    return (
-      <View style={[styles.messageWrapper, isOwn ? styles.ownWrapper : styles.otherWrapper]}>
-        {showSenderName && (
-          <Text style={styles.senderName}>{item.senderName}</Text>
-        )}
-        <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
-          <Text style={[styles.messageText, isOwn ? styles.ownText : styles.otherText]}>
-            {item.text}
+      return (
+        <View style={[styles.messageGroup, isMine ? styles.mineGroup : styles.theirGroup]}>
+          {showSender ? <Text style={styles.senderName}>{item.senderName}</Text> : null}
+          <View style={[styles.bubble, isMine ? styles.mineBubble : styles.theirBubble]}>
+            <Text style={[styles.messageText, isMine ? styles.mineText : styles.theirText]}>{item.text}</Text>
+          </View>
+          <Text style={[styles.timeText, isMine ? styles.mineTime : styles.theirTime]}>
+            {safeTimeString(item.createdAt)}
           </Text>
         </View>
-        <Text style={[styles.timestamp, isOwn ? styles.ownTimestamp : styles.otherTimestamp]}>
-          {formatTime(item.createdAt)}
-        </Text>
-      </View>
-    );
+      );
+    } catch {
+      return null;
+    }
   };
 
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -103,48 +118,49 @@ const ChatScreen: React.FC = () => {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 96 : 0}
     >
-      {/* Spot title header */}
-      <View style={styles.subHeader}>
-        <Ionicons name="location-outline" size={14} color={COLORS.primary} />
-        <Text style={styles.subHeaderText} numberOfLines={1}>{spotTitle}</Text>
+      <View style={styles.spotBanner}>
+        <Ionicons name="location-outline" size={14} color={theme.colors.primary} />
+        <Text style={styles.spotBannerText} numberOfLines={1}>{spotTitle}</Text>
       </View>
 
       <FlatList
-        ref={flatListRef}
+        ref={listRef}
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderMessage}
-        contentContainerStyle={styles.messagesList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        contentContainerStyle={styles.listContent}
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={
-          <View style={styles.emptyMessages}>
-            <Text style={styles.emptyText}>Say hi! Start the conversation.</Text>
+          <View style={styles.emptyState}>
+            <Ionicons name="chatbubble-ellipses-outline" size={36} color={theme.colors.textMuted} />
+            <Text style={styles.emptyTitle}>Start the conversation</Text>
+            <Text style={styles.emptySubtitle}>Ask about access, availability, or arrival details.</Text>
           </View>
         }
       />
 
-      <View style={styles.inputContainer}>
+      <View style={styles.inputBar}>
         <TextInput
           style={styles.input}
           value={inputText}
           onChangeText={setInputText}
-          placeholder="Type a message..."
-          placeholderTextColor={COLORS.textMuted}
+          placeholder="Type a message"
+          placeholderTextColor={theme.colors.inputPlaceholder}
           multiline
           maxLength={1000}
-          returnKeyType="default"
         />
         <TouchableOpacity
           style={[styles.sendButton, (!inputText.trim() || isSending) && styles.sendButtonDisabled]}
-          onPress={handleSend}
+          onPress={send}
           disabled={!inputText.trim() || isSending}
+          activeOpacity={0.9}
         >
           {isSending ? (
-            <ActivityIndicator size="small" color={COLORS.white} />
+            <ActivityIndicator size="small" color={theme.colors.textOnPrimary} />
           ) : (
-            <Ionicons name="send" size={18} color={COLORS.white} />
+            <Ionicons name="send" size={18} color={theme.colors.textOnPrimary} />
           )}
         </TouchableOpacity>
       </View>
@@ -152,101 +168,149 @@ const ChatScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  subHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
-    gap: 4,
-  },
-  subHeaderText: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.primary,
-    flex: 1,
-  },
-  messagesList: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    flexGrow: 1,
-  },
-  emptyMessages: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 80,
-  },
-  emptyText: {
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textSecondary,
-  },
-  messageWrapper: {
-    marginVertical: SPACING.xs,
-    maxWidth: '75%',
-  },
-  ownWrapper: { alignSelf: 'flex-end', alignItems: 'flex-end' },
-  otherWrapper: { alignSelf: 'flex-start', alignItems: 'flex-start' },
-  senderName: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textSecondary,
-    marginBottom: 2,
-    marginLeft: SPACING.sm,
-  },
-  bubble: {
-    borderRadius: BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  ownBubble: {
-    backgroundColor: COLORS.primary,
-    borderBottomRightRadius: BORDER_RADIUS.sm,
-  },
-  otherBubble: {
-    backgroundColor: COLORS.white,
-    borderBottomLeftRadius: BORDER_RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.gray[200],
-  },
-  messageText: { fontSize: FONTS.sizes.md, lineHeight: 20 },
-  ownText: { color: COLORS.white },
-  otherText: { color: COLORS.textPrimary },
-  timestamp: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted, marginTop: 2 },
-  ownTimestamp: { marginRight: SPACING.xs },
-  otherTimestamp: { marginLeft: SPACING.xs },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray[200],
-    gap: SPACING.sm,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: COLORS.gray[100],
-    borderRadius: BORDER_RADIUS.xl,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textPrimary,
-    maxHeight: 100,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: { backgroundColor: COLORS.gray[300] },
-});
+const createStyles = ({ colors, spacing, radii, typography, shadows }: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+    },
+    spotBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      backgroundColor: colors.surfaceElevated,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    spotBannerText: {
+      flex: 1,
+      color: colors.textSecondary,
+      fontSize: typography.sizes.sm,
+      fontWeight: typography.weights.semibold,
+    },
+    listContent: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      flexGrow: 1,
+    },
+    emptyState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingTop: spacing.xxxl,
+      paddingHorizontal: spacing.xl,
+    },
+    emptyTitle: {
+      marginTop: spacing.md,
+      color: colors.textPrimary,
+      fontSize: typography.sizes.lg,
+      fontWeight: typography.weights.bold,
+    },
+    emptySubtitle: {
+      marginTop: spacing.xs,
+      color: colors.textSecondary,
+      fontSize: typography.sizes.md,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    messageGroup: {
+      maxWidth: '80%',
+      marginVertical: spacing.xs,
+    },
+    mineGroup: {
+      alignSelf: 'flex-end',
+      alignItems: 'flex-end',
+    },
+    theirGroup: {
+      alignSelf: 'flex-start',
+      alignItems: 'flex-start',
+    },
+    senderName: {
+      marginBottom: 4,
+      marginLeft: spacing.sm,
+      color: colors.textMuted,
+      fontSize: typography.sizes.xs,
+      fontWeight: typography.weights.semibold,
+    },
+    bubble: {
+      borderRadius: radii.xl,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    mineBubble: {
+      backgroundColor: colors.primary,
+      borderBottomRightRadius: radii.sm,
+    },
+    theirBubble: {
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderBottomLeftRadius: radii.sm,
+    },
+    messageText: {
+      fontSize: typography.sizes.md,
+      lineHeight: 21,
+    },
+    mineText: {
+      color: colors.textOnPrimary,
+    },
+    theirText: {
+      color: colors.textPrimary,
+    },
+    timeText: {
+      marginTop: 4,
+      fontSize: typography.sizes.xs,
+      color: colors.textMuted,
+    },
+    mineTime: {
+      marginRight: spacing.xs,
+    },
+    theirTime: {
+      marginLeft: spacing.xs,
+    },
+    inputBar: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    input: {
+      flex: 1,
+      maxHeight: 112,
+      minHeight: 48,
+      borderRadius: radii.xl,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      color: colors.textPrimary,
+      fontSize: typography.sizes.md,
+    },
+    sendButton: {
+      width: 46,
+      height: 46,
+      borderRadius: radii.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+      ...shadows.glow,
+    },
+    sendButtonDisabled: {
+      opacity: 0.45,
+    },
+  });
 
 export default ChatScreen;

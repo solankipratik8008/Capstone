@@ -18,7 +18,7 @@ import PrivacyPolicyScreen from '../screens/Settings/PrivacyPolicyScreen';
 import PaymentMethodsScreen from '../screens/Settings/PaymentMethodsScreen';
 import { ParkingPassScreen } from '../screens/Booking/ParkingPassScreen';
 import GateScannerScreen from '../screens/Booking/GateScannerScreen';
-import { COLORS } from '../constants';
+import { useAppTheme } from '../theme';
 
 export type ProfileStackParamList = {
   Profile: undefined;
@@ -39,11 +39,13 @@ export type ProfileStackParamList = {
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
 
 export const ProfileStackNavigator: React.FC = () => {
+  const { colors } = useAppTheme();
+
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: COLORS.background },
+        contentStyle: { backgroundColor: colors.background },
         animation: 'slide_from_right',
       }}
     >

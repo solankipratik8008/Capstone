@@ -1,17 +1,17 @@
-/**
- * SpotPreviewCard
- * Bottom slide-up card when a user taps any parking marker on the map.
- * Supports both user-listed ParkingSpot and Google Places NearbyPlace.
- */
-
-import React, { useCallback } from 'react';
+import React, { useMemo } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
-  Image, Alert, Linking, Platform, Animated,
+  Image,
+  Linking,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ParkingSpot, COLORS, SPACING, FONTS, BORDER_RADIUS, SHADOWS } from '../../constants';
+
+import { Amenity, ParkingSpot } from '../../constants';
 import { NearbyPlace } from '../../services/places';
+import { useAppTheme } from '../../theme';
 
 export type PreviewItem =
   | { kind: 'spot'; data: ParkingSpot; distance?: number | null }
@@ -23,253 +23,337 @@ interface Props {
   onClose: () => void;
 }
 
-/** Estimate travel time in minutes given distance in km */
-const travelTimes = (km: number | null | undefined) => {
-  if (!km) return null;
-  return {
-    walk:  Math.round((km / 5) * 60),
-    drive: Math.max(1, Math.round((km / 30) * 60)),
-    bike:  Math.round((km / 15) * 60),
-  };
+const AMENITY_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+  covered: 'umbrella-outline',
+  gated: 'shield-checkmark-outline',
+  ev_charging: 'flash-outline',
+  well_lit: 'bulb-outline',
+  security_camera: 'videocam-outline',
 };
 
-const formatDist = (km: number | null | undefined): string => {
-  if (!km) return '';
-  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+const PLACE_LABELS: Record<NearbyPlace['placeType'], string> = {
+  lot: 'Public lot',
+  mall: 'Mall parking',
+  plaza: 'Plaza parking',
+  street: 'Street parking',
 };
 
-const openDirections = (lat: number, lng: number, label: string) => {
-  const encodedLabel = encodeURIComponent(label);
+const distanceLabel = (distance?: number | null) => {
+  if (distance === null || distance === undefined) {
+    return null;
+  }
 
-  const options: { name: string; url: string }[] = Platform.OS === 'ios'
-    ? [
-        { name: 'Apple Maps',  url: `maps:0,0?daddr=${lat},${lng}` },
-        { name: 'Google Maps', url: `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving` },
-        { name: 'Waze',        url: `waze://?ll=${lat},${lng}&navigate=yes` },
-      ]
-    : [
-        { name: 'Google Maps', url: `google.navigation:q=${lat},${lng}` },
-        { name: 'Waze',        url: `waze://?ll=${lat},${lng}&navigate=yes` },
-      ];
+  return distance < 1 ? `${Math.round(distance * 1000)} m away` : `${distance.toFixed(1)} km away`;
+};
 
-  // Web fallback always works
-  const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-
-  const buttons = options.map((o) => ({
-    text: o.name,
-    onPress: async () => {
-      const canOpen = await Linking.canOpenURL(o.url).catch(() => false);
-      if (canOpen) {
-        Linking.openURL(o.url);
-      } else {
-        Linking.openURL(webUrl);
-      }
-    },
-  }));
-
-  buttons.push({ text: 'Cancel', onPress: () => {} });
-
-  Alert.alert('Open Directions', `Navigate to ${label}`, buttons as any);
+const openDirections = async (latitude: number, longitude: number) => {
+  const browserUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+  await Linking.openURL(browserUrl);
 };
 
 export const SpotPreviewCard: React.FC<Props> = ({ item, onViewDetails, onClose }) => {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const isSpot = item.kind === 'spot';
   const spot = isSpot ? (item.data as ParkingSpot) : null;
   const place = !isSpot ? (item.data as NearbyPlace) : null;
+  const distance = distanceLabel(item.distance);
+  const amenities: Amenity[] = spot?.amenities?.slice(0, 3) ?? [];
+  const image = isSpot && spot?.imageURLs?.length ? { uri: spot.imageURLs[0] } : null;
 
-  const lat  = isSpot ? spot!.location.latitude  : place!.latitude;
-  const lng  = isSpot ? spot!.location.longitude : place!.longitude;
-  const name = isSpot ? spot!.title : place!.name;
-  const addr = isSpot ? (spot!.location.address || spot!.location.city || '') : place!.vicinity;
-  const km   = item.distance;
-  const times = travelTimes(km);
-
-  const imageUri = isSpot && spot!.imageURLs.length > 0
-    ? spot!.imageURLs[0]
-    : null;
+  const title = isSpot ? spot!.title : place!.name;
+  const address = isSpot
+    ? spot!.location.address || `${spot!.location.city || ''} ${spot!.location.state || ''}`.trim()
+    : place!.vicinity;
+  const price = isSpot ? `$${spot!.pricePerHour}/hr` : null;
+  const typeLabel = isSpot ? 'Bookable Parking' : 'Public Parking';
 
   return (
-    <View style={styles.card}>
-      {/* Handle bar */}
-      <View style={styles.handleBar} />
+    <View style={styles.overlay} pointerEvents="box-none">
+      <View style={styles.card}>
+        <View style={styles.handle} />
 
-      {/* Close */}
-      <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-        <Ionicons name="close" size={20} color={COLORS.textSecondary} />
-      </TouchableOpacity>
-
-      {/* Image row */}
-      <View style={styles.imageRow}>
-        <View style={styles.imageBox}>
-          {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.image} />
-          ) : (
-            <View style={[styles.imagePlaceholder, { backgroundColor: isSpot ? COLORS.primary + '18' : COLORS.places + '18' }]}>
-              <Ionicons
-                name={isSpot ? 'car' : 'business'}
-                size={32}
-                color={isSpot ? COLORS.primary : COLORS.places}
-              />
-            </View>
-          )}
-          {/* Type badge */}
-          <View style={[styles.typeBadge, { backgroundColor: isSpot ? COLORS.primary : COLORS.places }]}>
-            <Text style={styles.typeBadgeText}>{isSpot ? 'ParkSpot' : 'Paid Lot'}</Text>
-          </View>
-        </View>
-
-        {/* Info */}
-        <View style={styles.infoCol}>
-          <Text style={styles.spotName} numberOfLines={2}>{name}</Text>
-          {!!addr && (
-            <View style={styles.addrRow}>
-              <Ionicons name="location-outline" size={12} color={COLORS.textMuted} />
-              <Text style={styles.addrText} numberOfLines={1}>{addr}</Text>
-            </View>
-          )}
-
-          {/* Price / Status */}
-          <View style={styles.priceRow}>
-            {isSpot ? (
-              <>
-                <Text style={styles.price}>${spot!.pricePerHour}<Text style={styles.priceUnit}>/hr</Text></Text>
-                <View style={[styles.availBadge, { backgroundColor: spot!.isAvailable ? '#D1FAE5' : '#FEE2E2' }]}>
-                  <Text style={[styles.availText, { color: spot!.isAvailable ? '#065F46' : '#991B1B' }]}>
-                    {spot!.isAvailable ? 'Available' : 'Taken'}
-                  </Text>
-                </View>
-              </>
-            ) : (
-              <>
-                {place!.rating != null && (
-                  <View style={styles.ratingRow}>
-                    <Ionicons name="star" size={13} color={COLORS.accent} />
-                    <Text style={styles.rating}>{place!.rating.toFixed(1)}</Text>
-                  </View>
-                )}
-                {place!.openNow != null && (
-                  <View style={[styles.availBadge, { backgroundColor: place!.openNow ? '#D1FAE5' : '#FEE2E2' }]}>
-                    <Text style={[styles.availText, { color: place!.openNow ? '#065F46' : '#991B1B' }]}>
-                      {place!.openNow ? 'Open' : 'Closed'}
-                    </Text>
-                  </View>
-                )}
-              </>
-            )}
-            {!!km && <Text style={styles.dist}>{formatDist(km)}</Text>}
-          </View>
-        </View>
-      </View>
-
-      {/* Travel times */}
-      {times && (
-        <View style={styles.travelRow}>
-          <View style={styles.travelItem}>
-            <Ionicons name="walk-outline" size={16} color={COLORS.textSecondary} />
-            <Text style={styles.travelText}>{times.walk} min</Text>
-          </View>
-          <View style={styles.travelDivider} />
-          <View style={styles.travelItem}>
-            <Ionicons name="car-outline" size={16} color={COLORS.textSecondary} />
-            <Text style={styles.travelText}>{times.drive} min</Text>
-          </View>
-          <View style={styles.travelDivider} />
-          <View style={styles.travelItem}>
-            <Ionicons name="bicycle-outline" size={16} color={COLORS.textSecondary} />
-            <Text style={styles.travelText}>{times.bike} min</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Action buttons */}
-      <View style={styles.actionRow}>
-        <TouchableOpacity
-          style={styles.dirBtn}
-          onPress={() => openDirections(lat, lng, name)}
-        >
-          <Ionicons name="navigate-outline" size={16} color={COLORS.primary} />
-          <Text style={styles.dirBtnText}>Directions</Text>
+        <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.8}>
+          <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
         </TouchableOpacity>
 
-        {onViewDetails && (
-          <TouchableOpacity style={styles.detailsBtn} onPress={onViewDetails}>
-            <Text style={styles.detailsBtnText}>
-              {isSpot ? 'View & Book' : 'View Details'}
+        <View style={styles.headerRow}>
+          <View style={styles.imageWrap}>
+            {image ? (
+              <Image source={image} style={styles.image} />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Ionicons
+                  name={isSpot ? 'car-outline' : 'business-outline'}
+                  size={28}
+                  color={theme.colors.primary}
+                />
+              </View>
+            )}
+          </View>
+
+          <View style={styles.content}>
+            <Text style={styles.title} numberOfLines={2}>{title}</Text>
+            {address ? (
+              <View style={styles.metaRow}>
+                <Ionicons name="location-outline" size={14} color={theme.colors.textMuted} />
+                <Text style={styles.metaText} numberOfLines={1}>{address}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.tagRow}>
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>{typeLabel}</Text>
+              </View>
+              {!isSpot && place ? (
+                <View style={styles.tag}>
+                  <Text style={styles.tagText}>{PLACE_LABELS[place.placeType]}</Text>
+                </View>
+              ) : null}
+              {distance ? (
+                <View style={styles.tag}>
+                  <Text style={styles.tagText}>{distance}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {price ? <Text style={styles.price}>{price}</Text> : null}
+          </View>
+        </View>
+
+        {amenities.length > 0 ? (
+          <View style={styles.amenityRow}>
+            {amenities.map((amenity) => (
+              <View key={amenity} style={styles.amenityChip}>
+                <Ionicons
+                  name={AMENITY_ICONS[amenity] ?? 'checkmark-circle-outline'}
+                  size={12}
+                  color={theme.colors.primary}
+                />
+                <Text style={styles.amenityText}>{amenity.replace(/_/g, ' ')}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {!isSpot && place ? (
+          <View style={styles.publicNotice}>
+            <Ionicons name="information-circle-outline" size={14} color={theme.colors.primary} />
+            <Text style={styles.infoText}>Not Bookable. Booking is handled outside ParkSpot.</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={!isSpot ? styles.primaryAction : styles.secondaryAction}
+            onPress={() => openDirections(
+              isSpot ? spot!.location.latitude : place!.latitude,
+              isSpot ? spot!.location.longitude : place!.longitude
+            )}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="navigate-outline"
+              size={16}
+              color={!isSpot ? theme.colors.textOnPrimary : theme.colors.primary}
+            />
+            <Text style={!isSpot ? styles.primaryActionText : styles.secondaryActionText}>
+              {isSpot ? 'Directions' : 'Open Google Maps'}
             </Text>
-            <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
           </TouchableOpacity>
-        )}
+
+          {isSpot && onViewDetails ? (
+            <TouchableOpacity style={styles.primaryAction} onPress={onViewDetails} activeOpacity={0.9}>
+              <Text style={styles.primaryActionText}>View Details</Text>
+              <Ionicons name="arrow-forward" size={16} color={theme.colors.textOnPrimary} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  card: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.sm, paddingBottom: SPACING.xl,
-    ...SHADOWS.lg,
-  },
-  handleBar: {
-    width: 40, height: 4, borderRadius: 2,
-    backgroundColor: COLORS.gray[300],
-    alignSelf: 'center', marginBottom: SPACING.sm,
-  },
-  closeBtn: {
-    position: 'absolute', top: SPACING.md, right: SPACING.md,
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: COLORS.gray[100], alignItems: 'center', justifyContent: 'center',
-  },
-  imageRow: { flexDirection: 'row', gap: SPACING.md, marginBottom: SPACING.md },
-  imageBox: { position: 'relative', borderRadius: BORDER_RADIUS.lg, overflow: 'hidden' },
-  image: { width: 100, height: 90, borderRadius: BORDER_RADIUS.lg },
-  imagePlaceholder: {
-    width: 100, height: 90, borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  typeBadge: {
-    position: 'absolute', bottom: 6, left: 6,
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
-  },
-  typeBadgeText: { fontSize: 10, fontWeight: '700', color: COLORS.white },
-  infoCol: { flex: 1, justifyContent: 'center' },
-  spotName: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary, marginBottom: 4 },
-  addrRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 6 },
-  addrText: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted, flex: 1 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, flexWrap: 'wrap' },
-  price: { fontSize: FONTS.sizes.xl, fontWeight: FONTS.weights.bold, color: COLORS.primary },
-  priceUnit: { fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.regular, color: COLORS.textMuted },
-  availBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-  availText: { fontSize: FONTS.sizes.xs, fontWeight: FONTS.weights.semibold },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  rating: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semibold, color: COLORS.textPrimary },
-  dist: { fontSize: FONTS.sizes.sm, color: COLORS.textMuted, marginLeft: 'auto' },
-
-  travelRow: {
-    flexDirection: 'row', backgroundColor: COLORS.gray[50],
-    borderRadius: BORDER_RADIUS.lg, padding: SPACING.sm,
-    marginBottom: SPACING.md, alignItems: 'center',
-  },
-  travelItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  travelDivider: { width: 1, height: 20, backgroundColor: COLORS.gray[200] },
-  travelText: { fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.medium, color: COLORS.textSecondary },
-
-  actionRow: { flexDirection: 'row', gap: SPACING.sm },
-  dirBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.primary,
-  },
-  dirBtnText: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semibold, color: COLORS.primary },
-  detailsBtn: {
-    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg, backgroundColor: COLORS.primary,
-  },
-  detailsBtnText: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semibold, color: COLORS.white },
-});
+const createStyles = ({ colors, radii, spacing, typography, shadows }: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+    },
+    card: {
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.xl,
+      borderRadius: radii.xxl,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.lg,
+      ...shadows.lg,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 44,
+      height: 4,
+      borderRadius: radii.full,
+      backgroundColor: colors.borderStrong,
+      marginBottom: spacing.md,
+    },
+    closeButton: {
+      position: 'absolute',
+      top: spacing.md,
+      right: spacing.md,
+      width: 32,
+      height: 32,
+      borderRadius: radii.full,
+      backgroundColor: colors.surfaceMuted,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+    },
+    imageWrap: {
+      width: 92,
+      height: 92,
+      borderRadius: radii.xl,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceMuted,
+    },
+    image: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    imagePlaceholder: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    content: {
+      flex: 1,
+      paddingRight: spacing.xl,
+    },
+    title: {
+      color: colors.textPrimary,
+      fontSize: typography.sizes.lg,
+      fontWeight: typography.weights.bold,
+      lineHeight: 22,
+      marginBottom: spacing.xs,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      marginBottom: spacing.sm,
+    },
+    metaText: {
+      flex: 1,
+      color: colors.textSecondary,
+      fontSize: typography.sizes.sm,
+    },
+    tagRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginBottom: spacing.sm,
+    },
+    tag: {
+      borderRadius: radii.full,
+      backgroundColor: colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+    },
+    tagText: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.xs,
+      fontWeight: typography.weights.semibold,
+    },
+    price: {
+      color: colors.primary,
+      fontSize: typography.sizes.xl,
+      fontWeight: typography.weights.bold,
+    },
+    amenityRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginTop: spacing.md,
+    },
+    amenityChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.primaryFaint,
+      borderRadius: radii.full,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+    },
+    amenityText: {
+      color: colors.primary,
+      fontSize: typography.sizes.xs,
+      fontWeight: typography.weights.semibold,
+      textTransform: 'capitalize',
+    },
+    publicNotice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      marginTop: spacing.md,
+      borderRadius: radii.lg,
+      backgroundColor: colors.primaryFaint,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+    },
+    infoText: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.sm,
+      lineHeight: 20,
+    },
+    actions: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    secondaryAction: {
+      flex: 1,
+      minHeight: 48,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      backgroundColor: 'transparent',
+    },
+    secondaryActionText: {
+      color: colors.primary,
+      fontSize: typography.sizes.md,
+      fontWeight: typography.weights.bold,
+    },
+    primaryAction: {
+      flex: 1.2,
+      minHeight: 48,
+      borderRadius: radii.lg,
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      ...shadows.glow,
+    },
+    primaryActionText: {
+      color: colors.textOnPrimary,
+      fontSize: typography.sizes.md,
+      fontWeight: typography.weights.bold,
+    },
+  });
 
 export default SpotPreviewCard;

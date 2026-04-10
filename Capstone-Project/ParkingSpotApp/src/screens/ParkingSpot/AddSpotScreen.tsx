@@ -577,22 +577,22 @@ export const AddSpotScreen: React.FC = () => {
                       styles={{
                         textInput: {
                           height: 50,
-                          backgroundColor: COLORS.white,
+                          backgroundColor: COLORS.surfaceMuted,
                           borderRadius: BORDER_RADIUS.md,
                           paddingHorizontal: SPACING.md,
                           fontSize: FONTS.sizes.md,
                           color: COLORS.textPrimary,
                           borderWidth: 1,
-                          borderColor: errors.address && touched.address ? COLORS.error : COLORS.gray[300],
+                          borderColor: errors.address && touched.address ? COLORS.error : COLORS.border,
                         },
                         listView: {
                           position: 'absolute',
                           top: 50, // Height of text input
                           zIndex: 1000,
-                          backgroundColor: COLORS.white,
+                          backgroundColor: COLORS.surface,
                           borderRadius: BORDER_RADIUS.md,
                           borderWidth: 1,
-                          borderColor: COLORS.gray[200],
+                          borderColor: COLORS.border,
                         },
                       }}
                       enablePoweredByContainer={false}
@@ -725,9 +725,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
+    borderBottomColor: COLORS.border,
   },
   headerTitle: {
     fontSize: FONTS.sizes.lg,
@@ -742,6 +742,11 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: SPACING.xl,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.lg,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -776,7 +781,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
   },
   addImageButtons: {
@@ -788,10 +793,11 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 2,
-    borderColor: COLORS.gray[300],
+    borderColor: COLORS.border,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: COLORS.surfaceMuted,
   },
   addImageText: {
     fontSize: FONTS.sizes.sm,
@@ -819,9 +825,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surfaceMuted,
     padding: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     ...SHADOWS.sm,
   },
   availabilityLabel: {

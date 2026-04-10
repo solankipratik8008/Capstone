@@ -15,59 +15,64 @@ import {
   signInWithCredential,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, collection, query, where, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './config';
-import { User, UserRole, COLLECTIONS } from '../../constants';
+import { AppleSignInParams, User, UserRole, COLLECTIONS } from '../../constants';
 
 /**
  * Creates a new user account with email and password
  * Also creates a user document in Firestore
  */
+/**
+ * Normalises a phone number to E.164 format (+1XXXXXXXXXX).
+ * Strips spaces, dashes, parentheses, and ensures a leading "+".
+ */
+const normalisePhone = (raw: string): string => {
+  const digits = raw.replace(/\D/g, '');
+  if (raw.trim().startsWith('+')) {
+    return '+' + digits;
+  }
+  // Fallback: assume North-American number if 10 digits, else leave bare digits
+  return digits.length === 10 ? '+1' + digits : '+' + digits;
+};
+
 export const signUp = async (
   email: string,
   password: string,
   name: string,
-  role: UserRole
+  role: UserRole,
+  phone?: string,
 ): Promise<User> => {
   let firebaseUser = null;
 
   try {
-    // Create Firebase auth user
-    console.log('Creating Firebase Auth user...');
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     firebaseUser = userCredential.user;
-    console.log('Firebase Auth user created:', firebaseUser.uid);
 
-    // Update display name
     await updateProfile(firebaseUser, { displayName: name });
-    console.log('Display name updated');
 
-    // Create user document in Firestore
+    // Normalise phone to E.164 so getUserByPhone always matches
+    const normalisedPhone = phone ? normalisePhone(phone) : undefined;
+
     const userData: Omit<User, 'uid'> = {
       email,
       name,
       role,
+      ...(normalisedPhone ? { phone: normalisedPhone } : {}),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    console.log('Creating Firestore user document...');
     await setDoc(doc(db, COLLECTIONS.USERS, firebaseUser.uid), {
       ...userData,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    console.log('Firestore user document created successfully');
 
-    return {
-      uid: firebaseUser.uid,
-      ...userData,
-    };
+    return { uid: firebaseUser.uid, ...userData };
   } catch (error: any) {
     console.error('Sign up error:', error);
-    // If Firebase Auth user was created but Firestore failed, still return basic user data
     if (firebaseUser && error.message?.includes('Firestore')) {
-      console.log('Firestore failed but Auth succeeded, returning basic user data');
       return {
         uid: firebaseUser.uid,
         email,
@@ -126,11 +131,22 @@ export const signIn = async (email: string, password: string): Promise<User> => 
 };
 
 /**
- * Signs in with Google ID token
+ * Signs in with Google token.
+ * Accepts either an ID token (native builds) or an access token (Expo Go / expo-auth-session).
+ * Pass the id token as the first arg; pass the access token as the second if no id token available.
  */
-export const signInWithGoogle = async (idToken: string): Promise<User> => {
+export const signInWithGoogle = async (
+  idToken: string,
+  accessToken?: string,
+  role: UserRole = UserRole.USER
+): Promise<User> => {
   try {
-    const credential = GoogleAuthProvider.credential(idToken);
+    if (!idToken && !accessToken) {
+      throw new Error('No Google token received.');
+    }
+
+    // GoogleAuthProvider.credential(idToken, accessToken) — either can be null
+    const credential = GoogleAuthProvider.credential(idToken || null, accessToken ?? null);
     const userCredential = await signInWithCredential(auth, credential);
     const firebaseUser = userCredential.user;
 
@@ -143,7 +159,7 @@ export const signInWithGoogle = async (idToken: string): Promise<User> => {
       const newUserData: Omit<User, 'uid'> = {
         email: firebaseUser.email || '',
         name: firebaseUser.displayName || 'User',
-        role: 'user' as UserRole, // Default role
+        role,
         photoURL: firebaseUser.photoURL || undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -175,22 +191,35 @@ export const signInWithGoogle = async (idToken: string): Promise<User> => {
  * rawNonce must be the ORIGINAL (unhashed) nonce used when requesting Apple auth.
  */
 export const signInWithApple = async (
-  identityToken: string,
-  rawNonce: string
+  params: AppleSignInParams
 ): Promise<User> => {
+  const {
+    identityToken,
+    nonce: rawNonce,
+    email,
+    name,
+    role = UserRole.USER,
+  } = params;
+
   try {
     const provider = new OAuthProvider('apple.com');
     const credential = provider.credential({ idToken: identityToken, rawNonce });
     const userCredential = await signInWithCredential(auth, credential);
     const firebaseUser = userCredential.user;
+    const resolvedName = firebaseUser.displayName || name || 'Apple User';
+    const resolvedEmail = firebaseUser.email || email || '';
+
+    if (name && firebaseUser.displayName !== name) {
+      await updateProfile(firebaseUser, { displayName: name });
+    }
 
     let userData = await getUserData(firebaseUser.uid);
 
     if (!userData) {
       const newUserData: Omit<User, 'uid'> = {
-        email: firebaseUser.email || '',
-        name: firebaseUser.displayName || 'Apple User',
-        role: 'user' as UserRole,
+        email: resolvedEmail,
+        name: resolvedName,
+        role,
         photoURL: firebaseUser.photoURL || undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -203,11 +232,53 @@ export const signInWithApple = async (
       });
 
       userData = { uid: firebaseUser.uid, ...newUserData };
+    } else {
+      const userUpdates: Partial<User> = {};
+
+      if (!userData.email && resolvedEmail) {
+        userUpdates.email = resolvedEmail;
+      }
+
+      if ((!userData.name || userData.name === 'Apple User') && resolvedName) {
+        userUpdates.name = resolvedName;
+      }
+
+      if (Object.keys(userUpdates).length > 0) {
+        await setDoc(doc(db, COLLECTIONS.USERS, firebaseUser.uid), {
+          ...userUpdates,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+
+        userData = {
+          ...userData,
+          ...userUpdates,
+          updatedAt: new Date(),
+        };
+      }
     }
 
     return userData;
   } catch (error: any) {
     console.error('Apple sign in error:', error);
+
+    if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/configuration-not-found') {
+      throw new Error(
+        'Apple Sign-In is not enabled in Firebase. Enable the Apple provider in Firebase Authentication and add the Apple Service ID, Team ID, Key ID, and private key.',
+      );
+    }
+
+    if (error.code === 'auth/missing-or-invalid-nonce') {
+      throw new Error(
+        'Apple Sign-In could not be verified. Rebuild the iOS app after updating Apple Sign-In settings so the secure nonce matches Firebase.',
+      );
+    }
+
+    if (error.code === 'auth/invalid-credential') {
+      throw new Error(
+        'Apple Sign-In credentials were rejected by Firebase. Confirm the Apple provider is enabled in Firebase and use a real iPhone or iPad running an Expo development build.',
+      );
+    }
+
     throw handleAuthError(error);
   }
 };
@@ -301,6 +372,50 @@ export const subscribeToAuthState = (
  */
 export const getCurrentFirebaseUser = (): FirebaseUser | null => {
   return auth.currentUser;
+};
+
+/**
+ * Looks up a user document in Firestore by phone number.
+ * Used by the phone-based password reset flow.
+ */
+export const getUserByPhone = async (phone: string): Promise<User | null> => {
+  try {
+    // Build a set of candidate formats to search so we match regardless of
+    // how the phone was stored (with or without leading "+").
+    const digits = phone.replace(/\D/g, '');
+    const candidates = Array.from(new Set([
+      phone,               // as-is: e.g. +15483848008
+      '+' + digits,        // normalised E.164
+      digits,              // bare digits
+    ]));
+
+    for (const candidate of candidates) {
+      const q = query(
+        collection(db, COLLECTIONS.USERS),
+        where('phone', '==', candidate),
+      );
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const docSnap = snapshot.docs[0];
+        const data = docSnap.data();
+        return {
+          uid: docSnap.id,
+          email: data.email,
+          name: data.name,
+          role: data.role as UserRole,
+          photoURL: data.photoURL,
+          phone: data.phone,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        };
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error looking up user by phone:', error);
+    return null;
+  }
 };
 
 /**

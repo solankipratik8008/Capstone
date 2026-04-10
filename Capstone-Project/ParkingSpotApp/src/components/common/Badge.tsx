@@ -1,14 +1,9 @@
-/**
- * Badge and Chip Components
- * For displaying status, tags, and selectable options
- */
-
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import React, { useMemo } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, BORDER_RADIUS, FONTS } from '../../constants';
 
-// Badge Component
+import { useAppTheme } from '../../theme';
+
 interface BadgeProps {
   text: string;
   variant?: 'success' | 'warning' | 'error' | 'info' | 'default';
@@ -22,16 +17,18 @@ export const Badge: React.FC<BadgeProps> = ({
   size = 'medium',
   style,
 }) => {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   return (
-    <View style={[styles.badge, styles[`badge_${variant}`], styles[`badge_${size}`], style]}>
-      <Text style={[styles.badgeText, styles[`badgeText_${variant}`], styles[`badgeText_${size}`]]}>
+    <View style={[styles.badge, styles[`badge_${variant}`], styles[`size_${size}`], style]}>
+      <Text style={[styles.badgeText, styles[`text_${variant}`], styles[`textSize_${size}`]]}>
         {text}
       </Text>
     </View>
   );
 };
 
-// Chip Component (selectable)
 interface ChipProps {
   label: string;
   selected?: boolean;
@@ -49,6 +46,10 @@ export const Chip: React.FC<ChipProps> = ({
   disabled = false,
   style,
 }) => {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const iconColor = selected ? theme.colors.textOnPrimary : theme.colors.textSecondary;
+
   return (
     <TouchableOpacity
       style={[
@@ -59,24 +60,14 @@ export const Chip: React.FC<ChipProps> = ({
       ]}
       onPress={onPress}
       disabled={disabled || !onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
-      {icon && (
-        <Ionicons
-          name={icon}
-          size={16}
-          color={selected ? COLORS.white : COLORS.textSecondary}
-          style={styles.chipIcon}
-        />
-      )}
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-        {label}
-      </Text>
+      {icon ? <Ionicons name={icon} size={16} color={iconColor} style={styles.chipIcon} /> : null}
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
     </TouchableOpacity>
   );
 };
 
-// Chip Group Component
 interface ChipGroupProps {
   items: { label: string; value: string; icon?: keyof typeof Ionicons.glyphMap }[];
   selectedValues: string[];
@@ -92,16 +83,20 @@ export const ChipGroup: React.FC<ChipGroupProps> = ({
   multiSelect = true,
   style,
 }) => {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const handlePress = (value: string) => {
     if (multiSelect) {
       if (selectedValues.includes(value)) {
-        onSelectionChange(selectedValues.filter((v) => v !== value));
+        onSelectionChange(selectedValues.filter((current) => current !== value));
       } else {
         onSelectionChange([...selectedValues, value]);
       }
-    } else {
-      onSelectionChange([value]);
+      return;
     }
+
+    onSelectionChange([value]);
   };
 
   return (
@@ -119,99 +114,99 @@ export const ChipGroup: React.FC<ChipGroupProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  // Badge styles
-  badge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-    alignSelf: 'flex-start',
-  },
-  badge_default: {
-    backgroundColor: COLORS.gray[200],
-  },
-  badge_success: {
-    backgroundColor: '#D1FAE5',
-  },
-  badge_warning: {
-    backgroundColor: '#FEF3C7',
-  },
-  badge_error: {
-    backgroundColor: '#FEE2E2',
-  },
-  badge_info: {
-    backgroundColor: '#DBEAFE',
-  },
-  badge_small: {
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: 2,
-  },
-  badge_medium: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-  },
-  badgeText: {
-    fontWeight: FONTS.weights.medium,
-  },
-  badgeText_default: {
-    color: COLORS.gray[700],
-  },
-  badgeText_success: {
-    color: '#065F46',
-  },
-  badgeText_warning: {
-    color: '#92400E',
-  },
-  badgeText_error: {
-    color: '#991B1B',
-  },
-  badgeText_info: {
-    color: '#1E40AF',
-  },
-  badgeText_small: {
-    fontSize: FONTS.sizes.xs,
-  },
-  badgeText_medium: {
-    fontSize: FONTS.sizes.sm,
-  },
-
-  // Chip styles
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.gray[100],
-    borderWidth: 1,
-    borderColor: COLORS.gray[200],
-    marginRight: SPACING.sm,
-    marginBottom: SPACING.sm,
-  },
-  chipSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  chipDisabled: {
-    opacity: 0.5,
-  },
-  chipIcon: {
-    marginRight: SPACING.xs,
-  },
-  chipText: {
-    fontSize: FONTS.sizes.sm,
-    fontWeight: FONTS.weights.medium,
-    color: COLORS.textSecondary,
-  },
-  chipTextSelected: {
-    color: COLORS.white,
-  },
-
-  // Chip Group styles
-  chipGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-});
+const createStyles = ({ colors, radii, spacing, typography }: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    badge: {
+      alignSelf: 'flex-start',
+      borderRadius: radii.full,
+      paddingHorizontal: spacing.sm,
+      borderWidth: 1,
+    },
+    badge_default: {
+      backgroundColor: colors.badgeNeutral,
+      borderColor: colors.border,
+    },
+    badge_success: {
+      backgroundColor: colors.primaryFaint,
+      borderColor: colors.primary,
+    },
+    badge_warning: {
+      backgroundColor: colors.badgeNeutral,
+      borderColor: colors.borderStrong,
+    },
+    badge_error: {
+      backgroundColor: colors.badgeNeutral,
+      borderColor: colors.borderStrong,
+    },
+    badge_info: {
+      backgroundColor: colors.primaryFaint,
+      borderColor: colors.primary,
+    },
+    size_small: {
+      paddingVertical: 3,
+    },
+    size_medium: {
+      paddingVertical: 5,
+    },
+    badgeText: {
+      fontWeight: typography.weights.semibold,
+      letterSpacing: 0.2,
+    },
+    text_default: {
+      color: colors.textSecondary,
+    },
+    text_success: {
+      color: colors.primary,
+    },
+    text_warning: {
+      color: colors.textSecondary,
+    },
+    text_error: {
+      color: colors.textSecondary,
+    },
+    text_info: {
+      color: colors.primary,
+    },
+    textSize_small: {
+      fontSize: typography.sizes.xs,
+    },
+    textSize_medium: {
+      fontSize: typography.sizes.sm,
+    },
+    chipGroup: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginRight: spacing.sm,
+      marginBottom: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radii.full,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    chipSelected: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    chipDisabled: {
+      opacity: 0.45,
+    },
+    chipIcon: {
+      marginRight: spacing.xs,
+    },
+    chipText: {
+      color: colors.textSecondary,
+      fontSize: typography.sizes.sm,
+      fontWeight: typography.weights.semibold,
+    },
+    chipTextSelected: {
+      color: colors.textOnPrimary,
+    },
+  });
 
 export default Badge;

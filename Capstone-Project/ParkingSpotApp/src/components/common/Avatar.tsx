@@ -1,12 +1,8 @@
-/**
- * Avatar Component
- * Displays user profile picture or initials
- */
-
-import React from 'react';
-import { View, Image, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useMemo } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONTS } from '../../constants';
+
+import { useAppTheme } from '../../theme';
 
 interface AvatarProps {
   source?: string | null;
@@ -17,10 +13,10 @@ interface AvatarProps {
 }
 
 const SIZES = {
-  small: 32,
+  small: 34,
   medium: 48,
-  large: 64,
-  xlarge: 96,
+  large: 68,
+  xlarge: 108,
 };
 
 const FONT_SIZES = {
@@ -37,95 +33,100 @@ export const Avatar: React.FC<AvatarProps> = ({
   onPress,
   showEditIcon = false,
 }) => {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const dimension = SIZES[size];
   const fontSize = FONT_SIZES[size];
 
-  // Get initials from name
-  const getInitials = (name?: string): string => {
-    if (!name) return '?';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  const initials = useMemo(() => {
+    if (!name?.trim()) {
+      return 'P';
     }
-    return name.substring(0, 2).toUpperCase();
-  };
 
-  const containerStyles = [
-    styles.container,
-    {
-      width: dimension,
-      height: dimension,
-      borderRadius: dimension / 2,
-    },
-  ];
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) {
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }, [name]);
 
   const content = source ? (
     <Image
       source={{ uri: source }}
-      style={[styles.image, { width: dimension, height: dimension, borderRadius: dimension / 2 }]}
+      style={[
+        styles.image,
+        { width: dimension, height: dimension, borderRadius: dimension / 2 },
+      ]}
     />
   ) : (
-    <View style={[styles.placeholder, { width: dimension, height: dimension, borderRadius: dimension / 2 }]}>
-      <Text style={[styles.initials, { fontSize }]}>{getInitials(name)}</Text>
+    <View
+      style={[
+        styles.placeholder,
+        { width: dimension, height: dimension, borderRadius: dimension / 2 },
+      ]}
+    >
+      <Text style={[styles.initials, { fontSize }]}>{initials}</Text>
     </View>
   );
 
-  if (onPress) {
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-        <View style={containerStyles}>
-          {content}
-          {showEditIcon && (
-            <View style={styles.editIcon}>
-              <Ionicons name="camera" size={14} color={COLORS.white} />
-            </View>
-          )}
+  const avatar = (
+    <View style={styles.container}>
+      {content}
+      {showEditIcon ? (
+        <View style={styles.editIcon}>
+          <Ionicons name="camera" size={14} color={theme.colors.textOnPrimary} />
         </View>
-      </TouchableOpacity>
-    );
+      ) : null}
+    </View>
+  );
+
+  if (!onPress) {
+    return avatar;
   }
 
   return (
-    <View style={containerStyles}>
-      {content}
-      {showEditIcon && (
-        <View style={styles.editIcon}>
-          <Ionicons name="camera" size={14} color={COLORS.white} />
-        </View>
-      )}
-    </View>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+      {avatar}
+    </TouchableOpacity>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    position: 'relative',
-  },
-  image: {
-    resizeMode: 'cover',
-  },
-  placeholder: {
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initials: {
-    color: COLORS.white,
-    fontWeight: FONTS.weights.bold,
-  },
-  editIcon: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: COLORS.gray[700],
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.white,
-  },
-});
+const createStyles = ({ colors, radii, spacing, typography }: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    container: {
+      position: 'relative',
+    },
+    image: {
+      resizeMode: 'cover',
+      borderWidth: 2,
+      borderColor: colors.surface,
+    },
+    placeholder: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
+    initials: {
+      color: colors.textOnPrimary,
+      fontWeight: typography.weights.bold,
+      letterSpacing: 0.4,
+    },
+    editIcon: {
+      position: 'absolute',
+      right: 0,
+      bottom: 0,
+      width: 28,
+      height: 28,
+      borderRadius: radii.full,
+      backgroundColor: colors.textPrimary,
+      borderWidth: 2,
+      borderColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingLeft: 1,
+      paddingTop: 1,
+    },
+  });
 
 export default Avatar;

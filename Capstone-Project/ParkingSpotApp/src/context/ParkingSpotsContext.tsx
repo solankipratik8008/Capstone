@@ -52,15 +52,6 @@ export const ParkingSpotsProvider: React.FC<ParkingSpotsProviderProps> = ({ chil
     return () => unsubscribe();
   }, []);
 
-  // Fetch user's own spots when user changes
-  useEffect(() => {
-    if (user) {
-      fetchUserSpots(user.uid);
-    } else {
-      setUserSpots([]);
-    }
-  }, [user]);
-
   /**
    * Fetches all available parking spots
    */
@@ -89,6 +80,15 @@ export const ParkingSpotsProvider: React.FC<ParkingSpotsProviderProps> = ({ chil
       console.error('Error fetching user spots:', err);
     }
   }, []);
+
+  // Fetch user's own spots when user changes
+  useEffect(() => {
+    if (user) {
+      fetchUserSpots(user.uid);
+    } else {
+      setUserSpots([]);
+    }
+  }, [fetchUserSpots, user]);
 
   /**
    * Creates a new parking spot
