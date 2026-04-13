@@ -380,13 +380,14 @@ export const getCurrentFirebaseUser = (): FirebaseUser | null => {
  */
 export const getUserByPhone = async (phone: string): Promise<User | null> => {
   try {
-    // Build a set of candidate formats to search so we match regardless of
-    // how the phone was stored (with or without leading "+").
+    // Build a set of candidate formats to match however the phone was stored:
+    // "+15483848008", "15483848008", "5483848008" (last 10 digits), etc.
     const digits = phone.replace(/\D/g, '');
     const candidates = Array.from(new Set([
-      phone,               // as-is: e.g. +15483848008
-      '+' + digits,        // normalised E.164
-      digits,              // bare digits
+      phone,               // as-is:  +15483848008
+      '+' + digits,        // E.164:  +15483848008
+      digits,              // all digits: 15483848008
+      digits.slice(-10),   // last 10 digits: 5483848008 (stored without country code)
     ]));
 
     for (const candidate of candidates) {

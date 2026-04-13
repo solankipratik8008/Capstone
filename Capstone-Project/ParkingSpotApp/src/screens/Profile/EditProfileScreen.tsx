@@ -68,12 +68,21 @@ export const EditProfileScreen: React.FC = () => {
     }
   };
 
+  const normalizePhone = (raw: string): string | undefined => {
+    if (!raw.trim()) return undefined;
+    const digits = raw.replace(/\D/g, '');
+    if (raw.trim().startsWith('+')) return '+' + digits;
+    // 10-digit North American number — prepend +1
+    if (digits.length === 10) return '+1' + digits;
+    return '+' + digits;
+  };
+
   const handleSubmit = async (values: { name: string; phone: string }) => {
     setIsSubmitting(true);
     try {
       await updateUserProfile({
         name: values.name,
-        phone: values.phone || undefined,
+        phone: normalizePhone(values.phone),
       });
       Alert.alert('Success', 'Profile updated successfully.', [
         { text: 'OK', onPress: () => navigation.goBack() },

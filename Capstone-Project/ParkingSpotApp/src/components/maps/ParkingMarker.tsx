@@ -88,7 +88,7 @@ export const PlacesMarker: React.FC<PlacesMarkerProps> = ({ place, selected = fa
         <View style={[styles.placeMarker, selected && styles.placeMarkerSelected]}>
           <Text style={[styles.placeText, selected && styles.placeTextSelected]}>P</Text>
         </View>
-        <View style={[styles.pointer, selected ? styles.pointerSelected : styles.placePointer]} />
+        <View style={[styles.pointer, selected ? styles.placePointerSelected : styles.placePointer]} />
       </TouchableOpacity>
     </Marker>
   );
@@ -170,31 +170,35 @@ const createStyles = ({ colors, radii, spacing, typography, shadows }: ReturnTyp
       borderTopColor: colors.primaryDark,
     },
     placePointer: {
-      borderTopColor: colors.gray[600],
+      borderTopColor: '#0891B2',
+    },
+    placePointerSelected: {
+      borderTopColor: '#0E7490',
     },
     placeMarker: {
-      width: 40,
-      height: 40,
+      width: 42,
+      height: 42,
       borderRadius: radii.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.gray[600],
-      borderWidth: 1,
-      borderColor: colors.gray[600],
+      backgroundColor: '#0891B2',
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
       ...shadows.sm,
     },
     placeMarkerSelected: {
-      backgroundColor: colors.gray[600],
-      borderColor: colors.primary,
-      borderWidth: 2,
+      backgroundColor: '#0E7490',
+      borderColor: '#FFFFFF',
+      borderWidth: 2.5,
     },
     placeText: {
-      color: colors.white,
+      color: '#FFFFFF',
       fontSize: typography.sizes.md,
       fontWeight: typography.weights.bold,
+      letterSpacing: 0.5,
     },
     placeTextSelected: {
-      color: colors.textOnPrimary,
+      color: '#FFFFFF',
     },
     userMarker: {
       width: 26,
