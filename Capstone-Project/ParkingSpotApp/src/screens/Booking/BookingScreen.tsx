@@ -19,6 +19,7 @@ import { BookingStatus } from '../../constants';
 import { BookingStackParamList } from '../../constants';
 import { useAuth } from '../../context';
 import { useAppTheme } from '../../theme';
+import { LogoSplash } from '../../components/common';
 
 const CLOUD_RUN_URL = 'https://parkspot-api-ccxrzypu3a-uc.a.run.app';
 
@@ -230,6 +231,11 @@ const BookingScreen: React.FC = () => {
   }
 
   // ── Main booking form ─────────────────────────────────────────────────────
+  // Full-screen logo splash while payment is processing
+  if (isProcessing) {
+    return <LogoSplash message="Processing payment…" />;
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
       <ScrollView

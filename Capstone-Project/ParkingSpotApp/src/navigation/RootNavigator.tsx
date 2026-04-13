@@ -10,7 +10,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthNavigator } from './AuthNavigator';
 import { MainTabNavigator } from './MainTabNavigator';
 import { useAuth } from '../context';
-import { Loading } from '../components/common';
+import { LogoSplash } from '../components/common';
 import { useAppTheme } from '../theme';
 
 export type RootStackParamList = {
@@ -24,9 +24,9 @@ export const RootNavigator: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const { navigationTheme } = useAppTheme();
 
-  // Show loading screen while checking auth state
+  // Show animated logo splash while checking auth state / logging in / signing up
   if (isLoading) {
-    return <Loading fullScreen message="Loading ParkSpot" />;
+    return <LogoSplash />;
   }
 
   return (
