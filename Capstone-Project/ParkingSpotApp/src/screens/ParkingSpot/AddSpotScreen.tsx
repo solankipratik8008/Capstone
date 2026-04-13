@@ -425,6 +425,14 @@ export const AddSpotScreen: React.FC = () => {
                         onBlur: handleBlur('address'),
                       }}
                       styles={{
+                        container: {
+                          flex: 0,
+                        },
+                        textInputContainer: {
+                          backgroundColor: 'transparent',
+                          padding: 0,
+                          margin: 0,
+                        },
                         textInput: {
                           height: 50,
                           backgroundColor: colors.inputBackground ?? colors.surfaceElevated,
@@ -434,6 +442,7 @@ export const AddSpotScreen: React.FC = () => {
                           color: colors.textPrimary,
                           borderWidth: 1,
                           borderColor: errors.address && touched.address ? '#EF4444' : colors.border,
+                          marginBottom: 0,
                         },
                         listView: {
                           position: 'absolute',
@@ -447,6 +456,7 @@ export const AddSpotScreen: React.FC = () => {
                         },
                         row: { backgroundColor: colors.surfaceElevated },
                         description: { color: colors.textPrimary, fontSize: typography.sizes.sm },
+                        poweredContainer: { display: 'none' },
                       }}
                       enablePoweredByContainer={false}
                     />
