@@ -1,12 +1,7 @@
 /**
- * VIEW Layer - Index
- *
- * Exports all screens and reusable UI components.
- * This is the "V" in MVC — responsible for everything the user sees.
+ * VIEW LAYER
+ * UI-only: screens + reusable components.
+ * No business logic — delegates everything to Controller.
  */
-
-// Screens
-export * from './screens/index';
-
-// UI Components
-export * from './components/index';
+export * from './screens';
+export * from './components';
